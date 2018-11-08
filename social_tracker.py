@@ -24,9 +24,9 @@ __SSIM_THRESHOLD = 0.97
 
 # mongo constaints
 __MONGO_PATH = "mongodb://127.0.0.1:27017",
-__MONGO_USERNAME = 'admin'
-__MONGO_PASSWORD = 'admin'
-__MONGO_AUTHSOURCE = 'admin'
+__MONGO_USERNAME = ''
+__MONGO_PASSWORD = ''
+__MONGO_AUTHSOURCE = ''
 
 # redis constaints
 __REDIS_HOST = "localhost"
