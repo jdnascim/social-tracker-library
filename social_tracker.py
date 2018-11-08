@@ -22,7 +22,7 @@ from skimage.measure import compare_ssim
 # similarity limit to consider two images equal
 __SSIM_THRESHOLD = 0.97
 
-# mongo constaints
+# mongo constaints - configure username, passwords and authsource according 
 __MONGO_PATH = "mongodb://127.0.0.1:27017",
 __MONGO_USERNAME = ''
 __MONGO_PASSWORD = ''
