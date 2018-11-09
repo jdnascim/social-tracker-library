@@ -22,11 +22,11 @@ from skimage.measure import compare_ssim
 # similarity limit to consider two images equal
 __SSIM_THRESHOLD = 0.97
 
-# mongo constaints - configure username, passwords and authsource according 
+# mongo constaints
 __MONGO_PATH = "mongodb://127.0.0.1:27017",
-__MONGO_USERNAME = ''
-__MONGO_PASSWORD = ''
-__MONGO_AUTHSOURCE = ''
+__MONGO_USERNAME = 'admin'
+__MONGO_PASSWORD = 'admin'
+__MONGO_AUTHSOURCE = 'admin'
 
 # redis constaints
 __REDIS_HOST = "localhost"
@@ -46,6 +46,16 @@ def __demoConnection():
 
     # returning database
     return client.Demo
+
+
+def __csvGenerator(csvfile):
+    """ csv generator """
+
+    f = open(csvfile, "r")
+    f.readline()
+
+    for line in csv.reader(f):
+        yield line
 
 
 def __different_images(link1, link2):
@@ -147,8 +157,11 @@ def __link_directory(link, it):
     return "Links/" + str(it) + "/" + link_dir
 
 
-def __write_line_b_csv(csvfile, line):
+def __write_line_b_csv(csvfile, line, newfile=False):
     """ write a entire line into the csv file """
+
+    if newfile is True and os.path.isfile(csvfile) is True:
+        os.remove(csvfile)
 
     with open(csvfile, 'a') as resultfile:
         wr = csv.writer(resultfile, dialect='excel')
@@ -172,7 +185,8 @@ def __ogImageGenerator(link):
 
 
 def __youtube_link_download(link, it, csvfile, path=""):
-    """ youtube download given a link """
+    """ youtube download given a link
+        used when scraping links (e.g scrap_link)"""
 
     try:
         name = __namefile(link)
@@ -183,7 +197,7 @@ def __youtube_link_download(link, it, csvfile, path=""):
         arq = path + "/" + name
 
         if not os.path.isfile(arq):
-            youtube_download(link, arq)
+            __youtube_download(link, arq)
 
             # -> ["name", "csvid", "source", "type", "path"]
             kind = __guessTypePath(arq)
@@ -199,7 +213,8 @@ def __youtube_link_download(link, it, csvfile, path=""):
 
 
 def __request_link_download(link, it, csvfile, path=""):
-    """ request download given a link """
+    """ request download given a link
+        used when scraping links (e.g scrap_link)"""
 
     try:
         name = __namefile(link)
@@ -272,7 +287,7 @@ def __collection_regstr_query(keywords):
 
     regstr = "("
     for key in keywords:
-        for word in key.split(" "):
+        for word in key["keyword"].split(" "):
                 regstr = regstr + "(?=.*" + word + ")"
         regstr = regstr + "|"
 
@@ -422,7 +437,7 @@ def merge_media(csvimage="image.csv", csvvideo="video.csv",
     print('\x1b[6;30;42m' + "Done." + '\x1b[0m')
 
 
-def youtube_download(link, output=None, noplaylist=True):
+def __youtube_download(link, output=None, noplaylist=True):
     """ youtube download """
 
     try:
@@ -436,13 +451,16 @@ def youtube_download(link, output=None, noplaylist=True):
     except KeyboardInterrupt:
         if os.path.isfile(__fileplusextension(output)):
             os.remove(__fileplusextension(output))
+        raise
     except Exception:
         raise
 
 
-def request_download(link, output):
+def __request_download(link, output):
     """request download"""
 
+    print(os.getcwd())
+    print(link, output)
     try:
         if not os.path.isfile(output):
             open(output, "wb").write(requests.get(link).content)
@@ -452,6 +470,37 @@ def request_download(link, output):
     except KeyboardInterrupt:
         if os.path.isfile(__fileplusextension(output)):
             os.remove(__fileplusextension(output))
+        raise
+    except Exception:
+        raise
+
+
+def image_csv_download(csvfile="image_list.csv", directory="."):
+    """ download media from the csv generated """
+
+    if directory[-1] == "/":
+        directory = directory[:-1]
+
+    try:
+        for line in __csvGenerator(directory + "/" + csvfile):
+            __request_download(line[0], directory + "/" + line[1])
+    except KeyboardInterrupt:
+        print("\nStopping...")
+    except Exception:
+        raise
+
+
+def video_csv_download(csvfile="video_list.csv", directory="."):
+    """ download media from the csv generated """
+
+    if directory[-1] == "/":
+        directory = directory[:-1]
+
+    try:
+        for line in __csvGenerator(directory + "/" + csvfile):
+            __youtube_download(line[0], directory + "/" + line[1])
+    except KeyboardInterrupt:
+        print("\nStopping...")
     except Exception:
         raise
 
@@ -473,14 +522,14 @@ def list_collections():
         print("")
 
 
-def keywordsGenerator(keywords):
+def __keywordsGenerator(keywords):
     """ generator for collection["keywords"] """
 
     for key in keywords:
         yield str(key["keyword"])
 
 
-def accountIDGenerator(accounts):
+def __accountIDGenerator(accounts):
     """ generator for collection["accounts"] """
 
     for acc in accounts:
@@ -490,10 +539,10 @@ def accountIDGenerator(accounts):
 # rules: if it matchs one of the keywords, it is in
 #        if one keyword has two or more words, all words have to be in the text
 #           in order to exist a match
-def cleanTitleMatch(cleanTitle, keywords):
+def __cleanTitleMatch(cleanTitle, keywords):
     """ verifies if cleanTitle of item matches one of the keywords """
 
-    for key in keywordsGenerator(keywords):
+    for key in __keywordsGenerator(keywords):
         match = True
         words = key.split()
         for wd in words:
@@ -506,18 +555,18 @@ def cleanTitleMatch(cleanTitle, keywords):
 
 
 # rules: if it matchs one of the users, it is in
-def accountMatch(uid, accounts):
+def __accountMatch(uid, accounts):
     """ verifies if user of the item matches the user set in the collection """
 
-    for acc in accountIDGenerator(accounts):
+    for acc in __accountIDGenerator(accounts):
         if acc == uid:
             return True
     return False
 
 
-def extract_collection_from_db(title, ownerId, start_date=None, end_date=None):
-    """ extracts items from a given collection, plus generates scripts to
-    download media """
+def __collectionContentGenerator(title, ownerId, start_date=None,
+                                 end_date=None):
+    """ generator of the content of a given collection """
 
     # connection with Mongo
     db_m = __demoConnection()
@@ -528,9 +577,69 @@ def extract_collection_from_db(title, ownerId, start_date=None, end_date=None):
                                             "title": title
                                              })[0]
 
+    # generate the query
+    items_query = dict()
+
+    items_query["title"] = __collection_regstr_query(
+        collection_settings["keywords"])
+
+    items_query["original"] = True
+
+    if start_date is not None:
+        items_query["publicationTime"] = {"$gt": __date2tmiles(start_date)}
+    else:
+        items_query["publicationTime"] = {"$gt": collection_settings["since"]}
+
+    if end_date is not None:
+        items_query["publicationTime"] = {"$gt": __date2tmiles(end_date)}
+
+    items = db_m.Item.find(items_query)
+
+    for it in items:
+        yield it
+
+
+def __mediaItem(m_id):
+    """ returns mediaItem given id """
+
+    db_m = __demoConnection()
+
+    return db_m.MediaItem.find({"_id": m_id})[0]
+
+
+def __expandURL(link):
+    """ returns "true" link to a page """
+    try:
+        return requests.get(link).url
+    except Exception:
+        return link
+
+
+def expand_url_links(link_list="link_list.csv"):
+    """ given the initial link_list extracted, expand its urls. it is
+        recommended to execute this routine, in order to avoid downloading the
+        same media more than once. Furthermore, it avoids dependance of a short
+        link """
+
+    try:
+        __write_line_b_csv(link_list + "_tmp", ["link", "store"], newfile=True)
+
+        for line in __csvGenerator(link_list):
+            url_line = __expandURL(line[0])
+            print(line[1])
+            __write_line_b_csv(link_list + "_tmp", [url_line, line[1]])
+
+        shutil.move(link_list + "_tmp", link_list)
+    except Exception:
+        os.remove(link_list+"_tmp")
+
+
+def extract_collection(title, ownerId, start_date=None, end_date=None):
+    """ extracts items from a given collection, plus generates scripts to
+    download media """
+
     # creates dir where things are going to be stored
-    directory = str(collection_settings["title"]) + "_" + str(
-        collection_settings["ownerId"])
+    directory = str(title) + "_" + str(ownerId)
 
     directory = directory.replace(" ", "")
 
@@ -547,116 +656,93 @@ def extract_collection_from_db(title, ownerId, start_date=None, end_date=None):
     head_list = ["link", "store"]
 
     # writes the headers
-    write_line_b_csv(directory + "/items.csv", head)
-    write_line_b_csv(directory + "/image.csv", head_media)
-    write_line_b_csv(directory + "/video.csv", head_media)
-    write_line_b_csv(directory + "/image_list.csv", head_list)
-    write_line_b_csv(directory + "/video_list.csv", head_list)
-    write_line_b_csv(directory + "/link_list.csv", head_list)
-
-    # generate the query
-    items_query = dict()
-
-    items_query["original"] = True
-
-    if start_date is not None:
-        items_query["publicationTime"] = {"$gt": __date2tmiles(start_date)}
-    else:
-        items_query["publicationTime"] = {"$gt": collection_settings["since"]}
-
-    if end_date is not None:
-        items_query["publicationTime"] = {"$gt": __date2tmiles(end_date)}
+    __write_line_b_csv(directory + "/items.csv", head, newfile=True)
+    __write_line_b_csv(directory + "/image.csv", head_media, newfile=True)
+    __write_line_b_csv(directory + "/video.csv", head_media, newfile=True)
+    __write_line_b_csv(directory + "/image_list.csv", head_list, newfile=True)
+    __write_line_b_csv(directory + "/video_list.csv", head_list, newfile=True)
+    __write_line_b_csv(directory + "/link_list.csv", head_list, newfile=True)
 
     # query - Item
     print("Fetching...")
-    items = db.Item.find(items_query)
-
-    # one_percent = db.Item.estimated_document_count() // 100
-    one_percent = items.count() // 100
 
     # for each item collected, verify if it matches the keywords and save in an
     # csv file the main attributes
     items_count = 0
-    total_count = 0
+
+    items = __collectionContentGenerator(title, ownerId, start_date, end_date)
 
     for it in items:
-        total_count += 1
 
-        if total_count % one_percent == 0 and total_count / one_percent < 100:
-            print(str(total_count / one_percent) + "% completed.")
+        line = []
 
-        # if the item match the keywords
-        if (cleanTitleMatch(it["cleanTitle"], collection_settings["keywords"])
-                or accountMatch(it["uid"], collection_settings["accounts"])):
+        line.append(str(items_count))
+        items_count += 1
 
-            line = []
+        # if the fields exists in the json, write it on csv
+        for field in ["title", "location", "publicationTime", "tags",
+                      "mediaIds", "links"]:
 
-            line.append(str(items_count))
-            items_count += 1
+            if field in it:
+                # convert data into human-readable format
+                if field == "publicationTime":
+                    line.append(str(__tmiles2date(it["publicationTime"])))
 
-            # if the fields exists in the json, write it on csv
-            for field in ["title", "location", "publicationTime", "tags",
-                          "mediaIds", "links"]:
+                # extra procedures if there is media related to the item
+                elif field == "mediaIds":
+                    # write the number of media related
+                    line.append(str(len(it["mediaIds"])))
 
-                if field in it:
-                    # convert data into human-readable format
-                    if field == "publicationTime":
-                        line.append(str(tmiles2date(it["publicationTime"])))
+                    m_ct = 1
+                    for m_id in it["mediaIds"]:
+                        mit = __mediaItem(m_id)
 
-                    # extra procedures if there is media related to the item
-                    elif field == "mediaIds":
-                        # write the number of media related
-                        line.append(str(len(it["mediaIds"])))
+                        name_media = line[0] + "_" + str(m_ct)
 
-                        m_ct = 1
-                        for m_id in it["mediaIds"]:
-                            mit = db.MediaItem.find({"_id": m_id})[0]
+                        if mit["type"] == "image":
+                            __write_line_b_csv(directory + "/image_list.csv",
+                                               [mit["url"]] +
+                                               ["Images/" + name_media])
 
-                            name_media = line[0] + "_" + str(m_ct)
+                            __write_line_b_csv(directory + "/image.csv",
+                                               [name_media] +
+                                               line[:-1] + [mit["source"]])
 
-                            if mit["type"] == "image":
-                                write_line_b_csv(directory + "/image_list.csv",
-                                                 [mit["url"]] +
-                                                 ["Images/" + name_media])
+                        elif mit["type"] == "video":
+                            __write_line_b_csv(directory + "/video_list.csv",
+                                               [mit["url"]] +
+                                               ["Videos/" + name_media])
 
-                                write_line_b_csv(directory + "/image.csv",
-                                                 [name_media] +
-                                                 line[:-1] + [mit["source"]])
+                            __write_line_b_csv(directory + "/video.csv",
+                                               [name_media] + line[:-1] +
+                                               [mit["source"]])
 
-                            elif mit["type"] == "video":
-                                write_line_b_csv(directory + "/video_list.csv",
-                                                 [mit["url"]] +
-                                                 ["Videos/" + name_media])
+                        m_ct += 1
 
-                                write_line_b_csv(directory + "/video.csv",
-                                                 [name_media] + line[:-1] +
-                                                 [mit["source"]])
+                elif field == "links":
+                    line.append(str(len(it["links"])))
 
-                            m_ct += 1
+                    if len(it["links"]) > 0:
+                        basedir = "Links/" + line[0]
 
-                    elif field == "links":
-                        line.append(str(len(it["links"])))
+                        for lit in it["links"]:
+                            __write_line_b_csv(directory + "/link_list.csv",
+                                               [lit] +
+                                               [str(line[0])])
 
-                        if len(it["links"]) > 0:
-                            basedir = "Links/" + line[0]
-
-                            for lit in it["links"]:
-                                write_line_b_csv(directory + "link_list.csv",
-                                                 [lit] + [str(line[0])])
-
-                    else:
-                        line.append(str(it[field]))
                 else:
-                    # indica no csv se não há nenhum item de imagem ou video,
-                    # ou nenhum link
-                    if field == "mediaIds" or field == "links":
-                        line.append(str(0))
-                    else:
-                        line.append("")
+                    line.append(str(it[field]))
+            else:
+                # it indicates in the csv if there is no image or video,
+                # or if there is no link
+                if field == "mediaIds" or field == "links":
+                    line.append(str(0))
+                else:
+                    line.append("")
 
-            write_line_b_csv(directory + "/items.csv", line)
+        __write_line_b_csv(directory + "/items.csv", line)
 
-    print("100.0% completed.")
+    print("100.0\% \completed.")
 
 
 def create_collection(title, ownerId, keywords):
