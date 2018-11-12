@@ -475,30 +475,31 @@ def __request_download(link, output):
         raise
 
 
-def image_csv_download(csvfile="image_list.csv", directory="."):
-    """ download media from the csv generated """
+def media_csv_download(csvfile, type, directory="."):
+    """ download media from the csv generated
+        type parameter: (I)mage or (V)ideo """
 
+    valid_types = {"i", "image", "v", "video"}
+
+    type = type.lower()
+
+    if type not in valid_types:
+
+        raise ValueError("Parameter type must be one of %r." % valid_types)
     if directory[-1] == "/":
         directory = directory[:-1]
 
     try:
-        for line in __csvGenerator(directory + "/" + csvfile):
-            __request_download(line[0], directory + "/" + line[1])
-    except KeyboardInterrupt:
-        print("\nStopping...")
-    except Exception:
-        raise
+        if type == "i" or type == "image":
+            for line in __csvGenerator(directory + "/" + csvfile):
+                    __request_download(line[7], directory + "/Images/" +
+                                       line[0])
 
+        elif type == "v" or type == "video":
+            for line in __csvGenerator(directory + "/" + csvfile):
+                    __youtube_download(line[7], directory + "/Videos/" +
+                                       line[0])
 
-def video_csv_download(csvfile="video_list.csv", directory="."):
-    """ download media from the csv generated """
-
-    if directory[-1] == "/":
-        directory = directory[:-1]
-
-    try:
-        for line in __csvGenerator(directory + "/" + csvfile):
-            __youtube_download(line[0], directory + "/" + line[1])
     except KeyboardInterrupt:
         print("\nStopping...")
     except Exception:
@@ -651,7 +652,7 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
     # header of the csv files
     head = ["csvid", "text", "location", "pubtime", "tags", "media"]
     head_media = ["name", "csvid", "text", "location", "pubtime", "tags",
-                  "source"]
+                  "source", "url"]
 
     head_list = ["link", "store"]
 
@@ -659,8 +660,6 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
     __write_line_b_csv(directory + "/items.csv", head, newfile=True)
     __write_line_b_csv(directory + "/image.csv", head_media, newfile=True)
     __write_line_b_csv(directory + "/video.csv", head_media, newfile=True)
-    __write_line_b_csv(directory + "/image_list.csv", head_list, newfile=True)
-    __write_line_b_csv(directory + "/video_list.csv", head_list, newfile=True)
     __write_line_b_csv(directory + "/link_list.csv", head_list, newfile=True)
 
     # query - Item
@@ -700,22 +699,14 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
                         name_media = line[0] + "_" + str(m_ct)
 
                         if mit["type"] == "image":
-                            __write_line_b_csv(directory + "/image_list.csv",
-                                               [mit["url"]] +
-                                               ["Images/" + name_media])
-
                             __write_line_b_csv(directory + "/image.csv",
-                                               [name_media] +
-                                               line[:-1] + [mit["source"]])
+                                               [name_media] + line[:-1] +
+                                               [mit["source"]] + [mit["url"]])
 
                         elif mit["type"] == "video":
-                            __write_line_b_csv(directory + "/video_list.csv",
-                                               [mit["url"]] +
-                                               ["Videos/" + name_media])
-
                             __write_line_b_csv(directory + "/video.csv",
                                                [name_media] + line[:-1] +
-                                               [mit["source"]])
+                                               [mit["source"]] + [mit["url"]])
 
                         m_ct += 1
 
@@ -788,3 +779,24 @@ def create_collection(title, ownerId, keywords):
 
     r = redis.StrictRedis(host=__REDIS_HOST, port=__REDIS_PORT, db=__REDIS_DB)
     r.publish("collections:new", json.dumps(new_collection))
+
+
+def collection_add_keywords(title, ownerId, new_keywords):
+    """ add new keywords in a given collection """
+
+    db_m = __demoConnection()
+
+    keys = db_m.Collection.find_one({'title': title,
+                                    'ownerId': ownerId})["keywords"]
+
+    for new_key in new_keywords:
+        keys.append({'keyword': new_key})
+
+    db_m.Collection.update_one({'title': title, 'ownerId': ownerId},
+                               {'$set': {'keywords': keys}})
+
+    edited_collection = db_m.Collection.find_one({'title': title,
+                                                  'ownerId': ownerId})
+
+    r = redis.StrictRedis(host=__REDIS_HOST, port=__REDIS_PORT, db=__REDIS_DB)
+    r.publish("collections:edit", json.dumps(edited_collection))
