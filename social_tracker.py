@@ -22,26 +22,20 @@ from skimage.measure import compare_ssim
 # similarity limit to consider two images equal
 __SSIM_THRESHOLD = 0.97
 
-# mongo constaints
-__MONGO_PATH = "mongodb://127.0.0.1:27017",
-__MONGO_USERNAME = ''
-__MONGO_PASSWORD = ''
-__MONGO_AUTHSOURCE = ''
-
-# redis constaints
-__REDIS_HOST = "localhost"
-__REDIS_PORT = 6379
-__REDIS_DB = 0
+# conf file
+__CONF_FILE = "conf.json"
 
 
 def __demoConnection():
     """ returns database connection """
+    with open(__CONF_FILE, 'r') as fp:
+        conf = json.load(fp)
 
     client = MongoClient(
-        __MONGO_PATH,
-        username=__MONGO_USERNAME,
-        password=__MONGO_PASSWORD,
-        authSource=__MONGO_AUTHSOURCE,
+        conf["mongo"]["path"],
+        username=conf["mongo"]["username"],
+        password=conf["mongo"]["password"],
+        authSource=conf["mongo"]["authsource"],
         unicode_decode_error_handler='ignore')
 
     # returning database
@@ -565,11 +559,11 @@ def __accountMatch(uid, accounts):
     return False
 
 
-def __collectionContentGenerator(title, ownerId, start_date=None,
-                                 end_date=None):
-    """ generator of the content of a given collection """
+def __item_query(title, ownerId, start_date=None, end_date=None,
+                 original=True):
+    """ given the name of a colleciton, its owner and start/end date, returns
+        the query to pass as parameter of db.Collection.Find() """
 
-    # connection with Mongo
     db_m = __demoConnection()
 
     # get the register concerning the collection passed as parameter
@@ -584,7 +578,7 @@ def __collectionContentGenerator(title, ownerId, start_date=None,
     items_query["title"] = __collection_regstr_query(
         collection_settings["keywords"])
 
-    items_query["original"] = True
+    items_query["original"] = original
 
     if start_date is not None:
         items_query["publicationTime"] = {"$gt": __date2tmiles(start_date)}
@@ -594,10 +588,57 @@ def __collectionContentGenerator(title, ownerId, start_date=None,
     if end_date is not None:
         items_query["publicationTime"] = {"$gt": __date2tmiles(end_date)}
 
-    items = db_m.Item.find(items_query)
+    return items_query
+
+
+def __collection_count(title, ownerId, start_date=None, end_date=None):
+        """ count the qtde of items given a collection """
+
+        # connection with Mongo
+        db_m = __demoConnection()
+
+        item_query = __item_query(title, ownerId, start_date, end_date)
+
+        return db_m.Item.find(item_query).count()
+
+
+def __collectionContentGenerator(title, ownerId, start_date=None,
+                                 end_date=None):
+    """ generator of the content of a given collection """
+
+    # connection with Mongo
+    db_m = __demoConnection()
+
+    item_query = __item_query(title, ownerId, start_date, end_date)
+
+    items = db_m.Item.find(item_query)
 
     for it in items:
         yield it
+
+
+def __items_tags_facet_query(title, ownerId, start_date=None, end_date=None):
+    """ facet query in 'tags' field of Item collection. """
+    db_m = __demoConnection()
+
+    item_query = __item_query(title, ownerId, start_date, end_date)
+
+    facet_query = db_m.Item.aggregate([
+        {'$match': item_query},
+        {'$unwind': "$tags"},
+        {'$group': {"_id": "$tags", "count": {'$sum': 1}}},
+        {'$sort': {'count': -1}},
+        {'$group': {"_id": None, "tags_facet": {'$push': {"tags": "$_id",
+                                                          "count": "$count"
+                                                          }}}},
+        {'$project': {"_id": 0, "tags_facet": 1}}
+    ])
+
+    # It will always iterate only once
+    for tags_facet in facet_query:
+        list_facet_tags = tags_facet["tags_facet"]
+
+    return list_facet_tags
 
 
 def __mediaItem(m_id):
@@ -618,9 +659,9 @@ def __expandURL(link):
 
 def expand_url_links(link_list="link_list.csv"):
     """ given the initial link_list extracted, expand its urls. it is
-        recommended to execute this routine, in order to avoid downloading the
-        same media more than once. Furthermore, it avoids dependance of a short
-        link """
+    recommended to execute this routine, in order to avoid downloading the
+    same media more than once. Furthermore, it avoids dependance of a short
+    link """
 
     try:
         __write_line_b_csv(link_list + "_tmp", ["link", "store"], newfile=True)
@@ -777,7 +818,11 @@ def create_collection(title, ownerId, keywords):
 
     db_m.Collection.insert_one(new_collection)
 
-    r = redis.StrictRedis(host=__REDIS_HOST, port=__REDIS_PORT, db=__REDIS_DB)
+    with open(__CONF_FILE, 'r') as fp:
+        conf = json.load(fp)
+
+    r = redis.StrictRedis(host=conf["redis"]["host"],
+                          port=conf["redis"]["port"], db=conf["redis"]["db"])
     r.publish("collections:new", json.dumps(new_collection))
 
 
@@ -798,5 +843,9 @@ def collection_add_keywords(title, ownerId, new_keywords):
     edited_collection = db_m.Collection.find_one({'title': title,
                                                   'ownerId': ownerId})
 
-    r = redis.StrictRedis(host=__REDIS_HOST, port=__REDIS_PORT, db=__REDIS_DB)
+    with open(__CONF_FILE, 'r') as fp:
+        conf = json.load(fp)
+
+    r = redis.StrictRedis(host=conf["redis"]["host"],
+                          port=conf["redis"]["port"], db=conf["redis"]["db"])
     r.publish("collections:edit", json.dumps(edited_collection))
