@@ -1,0 +1,21 @@
+{
+
+"mongo": 
+
+{
+"path": "mongodb://127.0.0.1:27017", 
+ "username": "", 
+ "password": "", 
+ "authsource": ""
+}, 
+
+
+"redis": 
+
+{
+"host": "localhost", 
+"port": 6379, 
+"db": 0
+}
+
+}
