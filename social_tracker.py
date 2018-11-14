@@ -14,6 +14,7 @@ import cv2
 import youtube_dl
 import redis
 import json
+import time
 from dateutil import parser
 from pymongo import MongoClient
 from skimage.measure import compare_ssim
@@ -265,7 +266,7 @@ def __link_file_unique(file, it, path):
 
 def __date2tmiles(dat):
     """ return timemiles from a date at the same format used in the system """
-    return int(parser.parse(str(timemiles)).strftime("%s")) * 1000
+    return int(parser.parse(str(dat)).strftime("%s")) * 1000
 
 
 def __tmiles2date(tmiles):
@@ -586,12 +587,13 @@ def __item_query(title, ownerId, start_date=None, end_date=None,
         items_query["publicationTime"] = {"$gt": collection_settings["since"]}
 
     if end_date is not None:
-        items_query["publicationTime"] = {"$gt": __date2tmiles(end_date)}
+        items_query["publicationTime"] = {"$lte": __date2tmiles(end_date)}
 
     return items_query
 
 
-def __collection_count(title, ownerId, start_date=None, end_date=None):
+def collection_item_count(title, ownerId, start_date=None, end_date=None,
+                          original=True):
         """ count the qtde of items given a collection """
 
         # connection with Mongo
@@ -617,11 +619,12 @@ def __collectionContentGenerator(title, ownerId, start_date=None,
         yield it
 
 
-def __items_tags_facet_query(title, ownerId, start_date=None, end_date=None):
+def __items_tags_facet_query(title, ownerId, start_date=None, end_date=None,
+                             original=True):
     """ facet query in 'tags' field of Item collection. """
     db_m = __demoConnection()
 
-    item_query = __item_query(title, ownerId, start_date, end_date)
+    item_query = __item_query(title, ownerId, start_date, end_date, original)
 
     facet_query = db_m.Item.aggregate([
         {'$match': item_query},
@@ -633,6 +636,8 @@ def __items_tags_facet_query(title, ownerId, start_date=None, end_date=None):
                                                           }}}},
         {'$project': {"_id": 0, "tags_facet": 1}}
     ])
+
+    list_facet_tags = []
 
     # It will always iterate only once
     for tags_facet in facet_query:
@@ -780,11 +785,6 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
 def create_collection(title, ownerId, keywords):
     """ create a collection """
 
-    # set the following variables
-    # ownerId = "mariano"  #user name
-    # title = "bolsonaro"  #Name (e.g. World Cup Final):
-    # keywords = ["bolsonaro", "", ""]  #Keywords (e.g. world cup, moscow)
-
     # future implementation
     # users = []  Users (e.g. prefeituraunicamp facebook, jornaloglobo twitter)
     # location = []  Location
@@ -798,7 +798,13 @@ def create_collection(title, ownerId, keywords):
         days=15)).strftime("%s")) * 1000
 
     keywords_strconf = []
+
+    # set(keywords) in order to avoid duplicates
+    set_keywords = set()
     for k in keywords:
+        set_keywords.add(k.lower())
+
+    for k in set_keywords:
         keywords_strconf.append({"keyword": k})
 
     db_m = __demoConnection()
@@ -832,9 +838,19 @@ def collection_add_keywords(title, ownerId, new_keywords):
     db_m = __demoConnection()
 
     keys = db_m.Collection.find_one({'title': title,
-                                    'ownerId': ownerId})["keywords"]
+                                     'ownerId': ownerId})["keywords"]
 
-    for new_key in new_keywords:
+    # create a set in order to not include a duplicate keyword
+    set_current_keys = set()
+    for k in keys:
+        set_current_keys.add(k["keyword"].lower())
+
+    set_new_keys = set()
+    for k in new_keywords:
+        if k.lower() not in set_current_keys:
+            set_new_keys.add(k.lower())
+
+    for new_key in set_new_keys:
         keys.append({'keyword': new_key})
 
     db_m.Collection.update_one({'title': title, 'ownerId': ownerId},
@@ -849,3 +865,34 @@ def collection_add_keywords(title, ownerId, new_keywords):
     r = redis.StrictRedis(host=conf["redis"]["host"],
                           port=conf["redis"]["port"], db=conf["redis"]["db"])
     r.publish("collections:edit", json.dumps(edited_collection))
+
+
+def query_expansion_tags(title, ownerId, tag_min_frequency=0.05,
+                         start_date=None, end_date=None, original=True):
+    """ applies query expansion related to tags """
+
+    if end_date is None:
+        end_date = datetime.datetime.now()
+
+    time.sleep(2)
+
+    ct = collection_item_count(title, ownerId, start_date, end_date)
+
+    if ct > 0:
+
+        list_facet_tags = __items_tags_facet_query(title, ownerId, start_date,
+                                                   end_date, original)
+
+        new_keywords = []
+
+        i = 0
+
+        while (i < len(list_facet_tags)
+               and list_facet_tags[i]["count"]/ct >= tag_min_frequency):
+
+            new_keywords.append(list_facet_tags[i]["tags"])
+            i += 1
+
+        collection_add_keywords(title, ownerId, new_keywords)
+    else:
+        print("Empty Collection")
