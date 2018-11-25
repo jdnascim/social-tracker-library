@@ -443,6 +443,8 @@ def __youtube_download(link, output=None, noplaylist=True):
             shutil.move(__fileplusextension(output), output)
         else:
             print("File " + output + " exists.")
+    except DownloadError:
+        pass
     except KeyboardInterrupt:
         if os.path.isfile(__fileplusextension(output)):
             os.remove(__fileplusextension(output))
