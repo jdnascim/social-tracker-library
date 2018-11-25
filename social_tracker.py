@@ -454,12 +454,10 @@ def __youtube_download(link, output=None, noplaylist=True):
 def __request_download(link, output):
     """request download"""
 
-    print(os.getcwd())
-    print(link, output)
     try:
         if not os.path.isfile(output):
             open(output, "wb").write(requests.get(link).content)
-            print(output)
+            print(link, output)
         else:
             print("File " + output + " exists.")
     except KeyboardInterrupt:
@@ -470,27 +468,34 @@ def __request_download(link, output):
         raise
 
 
-def media_csv_download(csvfile, type, directory="."):
+def media_csv_download(csvfile, type_file="", directory="."):
     """ download media from the csv generated
         type parameter: (I)mage or (V)ideo """
 
     valid_types = {"i", "image", "v", "video"}
 
-    type = type.lower()
+    # if type not specified, get the type by the name of the csvfile
+    if type_file == "":
+        type_file = csvfile[:__lastocc(csvfile, ".")]
 
-    if type not in valid_types:
+    type_file = type_file.lower()
 
-        raise ValueError("Parameter type must be one of %r." % valid_types)
+    if type_file not in valid_types:
+        raise ValueError("Parameter type_file/csvfile must be one of %r." %
+                         valid_types)
+
     if directory[-1] == "/":
         directory = directory[:-1]
 
+    # now it iterates through the csvfile [__csvGenerator()] and download the
+    # items [*.download() -> depends on the type specified]
     try:
-        if type == "i" or type == "image":
+        if type_file == "i" or type_file == "image":
             for line in __csvGenerator(directory + "/" + csvfile):
                     __request_download(line[7], directory + "/Images/" +
                                        line[0])
 
-        elif type == "v" or type == "video":
+        elif type_file == "v" or type_file == "video":
             for line in __csvGenerator(directory + "/" + csvfile):
                     __youtube_download(line[7], directory + "/Videos/" +
                                        line[0])
