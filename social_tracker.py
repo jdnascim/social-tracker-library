@@ -344,14 +344,6 @@ def __remove_duplicate_media(imagepath="Images", videopath="Videos",
     print('\x1b[6;30;42m' + "Done." + '\x1b[0m')
 
 
-# write the links header into the csv
-def init_linkscsv(csvfile="links.csv", create_if_exists=False):
-    if create_if_exists or (os.path.isfile(csvfile) is False):
-        head_media = ["name", "csvid", "source", "type", "path"]
-        os.system("rm " + csvfile)
-        __write_line_b_csv(csvfile, head_media)
-
-
 def merge_media(csvimage="image.csv", csvvideo="video.csv",
                 csvlinks="links.csv", csvitems="items.csv", imagepath="Images",
                 videopath="Videos", linkspath="Links"):
@@ -584,12 +576,15 @@ def __item_query(title, ownerId, start_date=None, end_date=None,
     items_query["title"] = __collection_regstr_query(
         collection_settings["keywords"])
 
-    items_query["original"] = original
+    # if original is true, query should return only orginal. If orginal is
+    # false, query should ignore whether item is original or not
+    if original is True:
+        items_query["original"] = original
 
     if start_date is not None:
-        items_query["publicationTime"] = {"$gt": __date2tmiles(start_date)}
+        items_query["publicationTime"] = {"$gte": __date2tmiles(start_date)}
     else:
-        items_query["publicationTime"] = {"$gt": collection_settings["since"]}
+        items_query["publicationTime"] = {"$gte": collection_settings["since"]}
 
     if end_date is not None:
         items_query["publicationTime"] = {"$lte": __date2tmiles(end_date)}
@@ -627,6 +622,7 @@ def __collectionContentGenerator(title, ownerId, start_date=None,
 def __items_tags_facet_query(title, ownerId, start_date=None, end_date=None,
                              original=True):
     """ facet query in 'tags' field of Item collection. """
+
     db_m = __demoConnection()
 
     item_query = __item_query(title, ownerId, start_date, end_date, original)
@@ -667,7 +663,7 @@ def __expandURL(link):
         return link
 
 
-def expand_url_links(link_list="link_list.csv"):
+def __expand_url_links(link_list="link_list.csv"):
     """ given the initial link_list extracted, expand its urls. it is
     recommended to execute this routine, in order to avoid downloading the
     same media more than once. Furthermore, it avoids dependance of a short
