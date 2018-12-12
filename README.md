@@ -28,6 +28,7 @@ underline. Hence, these methods are not going to be cited here.)
     counted
 
 **collection_add_keywords(title, ownerId, new_keywords)**
+
     * add new keywords to a given collection
 
 **query_expansion_tags(title, ownerId, tag_min_frequency=0.05,
@@ -71,7 +72,7 @@ be executed, in the following order:
 1. **merge_media(csvimage="image.csv", csvvideo="video.csv",
             csvlinks="links.csv", csvitems="items.csv", imagepath="Images",
             videopath="Videos", linkspath="Links")**
-            
+
     * Merge items collected in the step 2 and 3 (and delete redundant images or
     videos)
     * Unstable
