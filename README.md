@@ -8,31 +8,31 @@ Brief description of the methods:
 underline. Hence, these methods are not going to be cited here.)
 
 **list_collections()**
-    * It lists current collections in the system
+    1. It lists current collections in the system
 
 **create_collection(title, ownerId, keywords)**
-    * It creates an collection
-    * It only set keywords, setting users is still to be developed.
-    * Keywords parameter should be an list
+    1. It creates an collection
+    1. It only set keywords, setting users is still to be developed.
+    1. Keywords parameter should be an list
 
 **collection_item_count(title, ownerId, start_date=None, end_date=None,
-                      original=True**
-    * It returns the number of items related to the collections.
-    * Dates indicates a range of time which an item should be posted in order
+                      original=True)**
+    1. It returns the number of items related to the collections.
+    1. Dates indicates a range of time which an item should be posted in order
     to be counted. If None, start_date will be the collection start date, which
     is usually 30 days before its creation, and there will not be an end date.
-    * Parameter "original" indicates if, for instance, retweeted items should be
+    1. Parameter "original" indicates if, for instance, retweeted items should be
     counted
 
 **collection_add_keywords(title, ownerId, new_keywords)**
-    * add new keywords to a given collection
+    1. add new keywords to a given collection
 
 **query_expansion_tags(title, ownerId, tag_min_frequency=0.05,
         start_date=None, end_date=None, original=True)**
-    * Query expansion. It executes a facet query, and then the terms which
+    1. Query expansion. It executes a facet query, and then the terms which
     the frequency is higher that the one passed as parameter is added as
     keywords
-    * Dates and original parameters: they are explained in the description of
+    1. Dates and original parameters: they are explained in the description of
     the method collection_item_count()
 
 **Items Extraction**: In order to extract items from the database of the system to
