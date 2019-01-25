@@ -8,6 +8,7 @@ import csv
 import requests
 import math
 import random
+import unicodedata
 import filetype
 import re
 import cv2
@@ -18,6 +19,7 @@ import time
 from dateutil import parser
 from pymongo import MongoClient
 from skimage.measure import compare_ssim
+from lxml import html
 
 
 # similarity limit to consider two images equal
@@ -237,7 +239,10 @@ def __request_link_download(link, it, csvfile, path=""):
 def __lastocc(somestr, char):
     """ last occurence of a char in a string """
 
-    return max(i for i, c in enumerate(somestr) if c == char)
+    if char in somestr:
+        return max(i for i, c in enumerate(somestr) if c == char)
+    else:
+        return -1
 
 
 def __namefile(link):
@@ -433,8 +438,16 @@ def __youtube_download(link, output=None, noplaylist=True):
                                   'noplaylist': True}).download([link])
 
             shutil.move(__fileplusextension(output), output)
+
+
+            if bool(filetype.guess_mime(output)) is True:
+                print(link, output)
+                return True
+            else:
+                return False
         else:
             print("File " + output + " exists.")
+            return False
     except KeyboardInterrupt:
         if os.path.isfile(__fileplusextension(output)):
             os.remove(__fileplusextension(output))
@@ -449,9 +462,15 @@ def __request_download(link, output):
     try:
         if not os.path.isfile(output):
             open(output, "wb").write(requests.get(link).content)
-            print(link, output)
+
+            if bool(filetype.guess_mime(output)) is True:
+                print(link, output)
+                return True
+            else:
+                return False
         else:
             print("File " + output + " exists.")
+            return False
     except KeyboardInterrupt:
         if os.path.isfile(__fileplusextension(output)):
             os.remove(__fileplusextension(output))
@@ -460,7 +479,7 @@ def __request_download(link, output):
         raise
 
 
-def media_csv_download(csvfile, type_file="", directory="."):
+def media_csv_download(csvfile, type_file="", directory=".", csvset="set_links.csv"):
     """ download media from the csv generated
         type parameter: (I)mage or (V)ideo """
 
@@ -484,14 +503,25 @@ def media_csv_download(csvfile, type_file="", directory="."):
     try:
         if type_file == "i" or type_file == "image":
             for line in __csvGenerator(directory + "/" + csvfile):
-                    __request_download(line[7], directory + "/Images/" +
-                                       line[0])
+                linkfile = directory + "/Images/" + line[0]
+
+                chk = __request_download(line[7], linkfile)
+
+                if chk is True:
+                    __write_line_b_csv(csvset, [__expandURL(line[7]), line[1], linkfile])
 
         elif type_file == "v" or type_file == "video":
             for line in __csvGenerator(directory + "/" + csvfile):
-                    __youtube_download(line[7], directory + "/Videos/" +
-                                       line[0])
+                linkfile = directory + "/Videos/" + line[0]
 
+                chk = __youtube_download(line[7], linkfile)
+
+                if chk is True:
+                    __write_line_b_csv(csvset, [__expandURL(line[7]), line[1], linkfile])
+    # PRÓXIMO PASSOS:
+    # - CASO ESTEJA OK, IMPLEMENTAR AS ALTERAÇÕES NECESSÁRIAS PARA O DOWNLOAD
+    #   REFERENTE A LINKS
+    # - VERIFICAR A QUESTÃO DA BIBLIOTECA ARTICLE - TALVEZ IMPLEMENTAR
     except KeyboardInterrupt:
         print("\nStopping...")
     except Exception:
@@ -500,6 +530,9 @@ def media_csv_download(csvfile, type_file="", directory="."):
 
 def list_collections():
     """ lists current collections in the system """
+
+    print("List of the collections in the system")
+    print()
 
     db_m = __demoConnection()
 
@@ -513,6 +546,27 @@ def list_collections():
         print("status:", str(col["status"]))
         print("locations:", str(col["nearLocations"]))
         print("")
+
+
+def list_extracted_collections():
+    """ lists every extracted collection in the directory
+        configured in __CONF_FILE """
+
+    print("List of the extracted collections")
+    print()
+
+    with open(__CONF_FILE, 'r') as fp:
+        conf = json.load(fp)
+
+    path = conf["collections"]["path"]
+
+    try:
+        dir_list = next(os.walk(path))[1]
+        for dire in dir_list:
+            if dire[0] != '.':
+                print(dire)
+    except Exception:
+        pass
 
 
 def __keywordsGenerator(keywords):
@@ -644,7 +698,60 @@ def __items_tags_facet_query(title, ownerId, start_date=None, end_date=None,
     for tags_facet in facet_query:
         list_facet_tags = tags_facet["tags_facet"]
 
+    # Pre-processing phase
+
+    # 1 - Remove lower/upper case redundancy
+    lowerReduDict = dict()
+    lowerReduSet = set()
+    for i in range(len(list_facet_tags)):
+        if list_facet_tags[i]["tags"] == list_facet_tags[i]["tags"].lower():
+            lowerReduDict[list_facet_tags[i]["tags"]] = i
+
+    for i in range(len(list_facet_tags)):
+        tlw = list_facet_tags[i]["tags"].lower()
+
+        if list_facet_tags[i]["tags"] != tlw and tlw in lowerReduDict.keys():
+            list_facet_tags[lowerReduDict[tlw]]["count"] += list_facet_tags[i]["count"]
+            lowerReduSet.add(i)
+        elif list_facet_tags[i]["tags"] != tlw:
+            list_facet_tags[i]["tags"] = tlw
+            lowerReduDict[tlw] = i
+
+    list_facet_tags = [list_facet_tags[i] for i in range(len(list_facet_tags)) if i not in lowerReduSet]
+
+    # 2 - Add stressed words as "variant"
+    stressRemDict = dict()
+    stressRemSet = set()
+    for i in range(len(list_facet_tags)):
+        if list_facet_tags[i]["tags"] == __strip_accents(list_facet_tags[i]["tags"]):
+            stressRemDict[list_facet_tags[i]["tags"]] = i
+        list_facet_tags[i]["variant_keys"] = []
+
+
+    for i in range(len(list_facet_tags)):
+        tsr = __strip_accents(list_facet_tags[i]["tags"])
+
+        if list_facet_tags[i]["tags"] != tsr and tsr in stressRemDict.keys():
+            list_facet_tags[stressRemDict[tsr]]["count"] += list_facet_tags[i]["count"]
+            list_facet_tags[stressRemDict[tsr]]["variant_keys"].append(list_facet_tags[i]["tags"])
+            stressRemSet.add(i)
+        elif list_facet_tags[i]["tags"] != tsr:
+            list_facet_tags[i]["variant_keys"].append(list_facet_tags[i]["tags"])
+            list_facet_tags[i]["tags"] = tsr
+            stressRemDict[tsr] = i
+
+    list_facet_tags = [list_facet_tags[i] for i in range(len(list_facet_tags)) if i not in stressRemSet]
+
+    list_facet_tags.sort(reverse=True, key=lambda x: x['count'])
+
     return list_facet_tags
+
+
+def __strip_accents(s):
+    """ given a string, returns it without any stress """
+
+    return ''.join(c for c in unicodedata.normalize('NFD', s)
+        if unicodedata.category(c) != 'Mn').lower()
 
 
 def __mediaItem(m_id):
@@ -703,11 +810,15 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
 
     head_list = ["link", "store"]
 
+    head_set_links = ["link", "item_id", "path"]
+
     # writes the headers
     __write_line_b_csv(directory + "/items.csv", head, newfile=True)
     __write_line_b_csv(directory + "/image.csv", head_media, newfile=True)
     __write_line_b_csv(directory + "/video.csv", head_media, newfile=True)
     __write_line_b_csv(directory + "/link_list.csv", head_list, newfile=True)
+    __write_line_b_csv(directory + "/set_links.csv", head_set_links,
+                       newfile=True)
 
     # query - Item
     print("Fetching...")
@@ -780,7 +891,7 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
 
         __write_line_b_csv(directory + "/items.csv", line)
 
-    print("100.0\% \completed.")
+    print("100.0\% completed.")
 
 
 def create_collection(title, ownerId, keywords):
@@ -833,6 +944,20 @@ def create_collection(title, ownerId, keywords):
     r.publish("collections:new", json.dumps(new_collection))
 
 
+def __csv_to_dict(csvfile, id_key, id_value):
+    """ given a csv file, return a dict based upon it """
+
+    csvgen = __csvGenerator(csvfile)
+
+    next(csvgen)
+    csvdict = dict()
+
+    for row in csvgen:
+        csvdict[row[id_key]] = row[id_value]
+
+    return csvdict
+
+
 def collection_add_keywords(title, ownerId, new_keywords):
     """ add new keywords in a given collection """
 
@@ -868,8 +993,82 @@ def collection_add_keywords(title, ownerId, new_keywords):
     r.publish("collections:edit", json.dumps(edited_collection))
 
 
-def query_expansion_tags(title, ownerId, tag_min_frequency=0.05,
-                         start_date=None, end_date=None, original=True):
+def __reduced_text(text):
+    """ returns True if the twitter item (text) likely has more that 140
+    character (details about it in the expand_text description)"""
+
+    if len(text) >= 140 and "..." in text:
+        return True
+    else:
+        return False
+
+
+def expand_texts(csvitems="items.csv", csvlinks="link_list.csv"):
+    """ when a twitter item has more that 140 characters, only 140 characters
+    are stored in the database, and a link to the tweet is stored in the
+    "links" field. Obviously, if only a partial text is in the database, only
+    this partial text is going to be in the csv file. This functions aims to
+    scrap the full text of these items using the link to the tweet."""
+
+    LINK_PATTERN = "https://twitter.com/i/web/status/"
+
+    last_dot = __lastocc(csvitems, ".")
+
+    if last_dot == -1:
+        last_dot = len(csvitems)
+
+    AUG_IT = csvitems[:last_dot] + "_AUG_TEXT" + csvitems[last_dot:]
+
+    # STEP 1: Verify which items may need an text expansion
+    texts_dict = dict()
+
+    for it in __csvGenerator(csvitems):
+        if __reduced_text(it[1]):
+            texts_dict[int(it[0])] = ""
+
+    # STEP 2: Get the text of these items
+    for lnk in __csvGenerator(csvlinks):
+        if int(lnk[1]) in texts_dict.keys() and lnk[0][:33] == LINK_PATTERN:
+
+            texts_dict[int(lnk[1])] = int(lnk[0][33:])
+
+    # STEP 3: Create a new item file
+    itemsgen = __csvGenerator(csvitems)
+
+    # Write the header in the new file
+    __write_line_b_csv(AUG_IT, next(itemsgen), True)
+
+    for it in itemsgen:
+        if int(it[0]) in texts_dict.keys():
+            full_text = __full_tweet_text(LINK_PATTERN + str(texts_dict[int(it[0])]))
+
+            if len(full_text) > len(it[1]):
+                __write_line_b_csv(AUG_IT, it[:1] + [full_text] + it[2:])
+                print(it[0], full_text)
+            else:
+                __write_line_b_csv(AUG_IT, it)
+                print(it[0], it[1])
+        else:
+            __write_line_b_csv(AUG_IT, it)
+
+
+def __full_tweet_text(link_t):
+    """ given a link to a tweet, extract its entire text. It is necessary for
+    twitter items which has more than 140 characters """
+
+    page = requests.get(link_t)
+    tree = html.fromstring(page.content)
+    text = tree.xpath('//div[contains(@class, "permalink-tweet-container")]//p[contains(@class, "tweet-text")]//text()')
+
+    for i in range(len(text)):
+        if text[i][:4] == "pic." or text[i][:7] == "http://" or text[i][:4] == "www." or text[i][:8] == "https://":
+
+            text[i] = " " + text[i]
+
+    return "".join(text)
+
+
+def query_expansion_tags(title, ownerId, start_date=None, end_date=None, original=True, tag_min_frequency=0.005, ask_conf=True):
     """ applies query expansion related to tags """
 
     if end_date is None:
@@ -891,7 +1090,19 @@ def query_expansion_tags(title, ownerId, tag_min_frequency=0.05,
         while (i < len(list_facet_tags)
                and list_facet_tags[i]["count"]/ct >= tag_min_frequency):
 
-            new_keywords.append(list_facet_tags[i]["tags"])
+            if ask_conf is False:
+                new_keywords.append(list_facet_tags[i]["tags"])
+
+                for k in list_facet_tags[i]["variant_keys"]:
+                    new_keywords.append(k)
+            else:
+                if str(input("add " + str(list_facet_tags[i]["tags"]) + "? (y/n)\n")) == "y":
+                    new_keywords.append(list_facet_tags[i]["tags"])
+
+                for k in list_facet_tags[i]["variant_keys"]:
+                    if str(input("add variant " + str(k) + "? (y/n)\n")) == "y":
+                        new_keywords.append(k)
+
             i += 1
 
         collection_add_keywords(title, ownerId, new_keywords)

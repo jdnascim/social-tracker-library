@@ -4,9 +4,9 @@
 
 {
 "path": "mongodb://127.0.0.1:27017", 
- "username": "", 
- "password": "", 
- "authsource": ""
+ "username": "admin", 
+ "password": "admin", 
+ "authsource": "admin"
 }, 
 
 
@@ -16,6 +16,12 @@
 "host": "localhost", 
 "port": 6379, 
 "db": 0
+},
+
+"collections":
+
+{
+"path": "./"
 }
 
 }
