@@ -524,7 +524,8 @@ def media_csv_download(csvfile, type_file="", directory=".", csvset="set_links.c
     # - VERIFICAR A QUESTÃO DA BIBLIOTECA ARTICLE - TALVEZ IMPLEMENTAR
     except KeyboardInterrupt:
         print("\nStopping...")
-    except Exception:
+    except Exception as e:
+        print(e)
         raise
 
 
