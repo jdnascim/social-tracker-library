@@ -5,7 +5,7 @@ Python library to communicate with social tracker
 Brief description of the methods:
 
 (Obs: You are not supposed to call any method which name start with double
-underline. Hence, these methods are not going to be cited here.)
+underline. These methods are not going to be cited here.)
 
 **list_collections()**
 
@@ -31,14 +31,16 @@ underline. Hence, these methods are not going to be cited here.)
 
     * add new keywords to a given collection
 
-**query_expansion_tags(title, ownerId, tag_min_frequency=0.05,
-        start_date=None, end_date=None, original=True)**
+**query_expansion_tags(title, ownerId, start_date=None, end_date=None,
+  original=True, tag_min_frequency=0.005, ask_conf=True)**
 
     * Query expansion. It executes a facet query, and then the terms which
     the frequency is higher that the one passed as parameter is added as
     keywords
     * Dates and original parameters: they are explained in the description of
     the method collection_item_count()
+    * ask_conf determines if the procedure asks you for each tag with high
+    frequency if it should be added as new keyword in the collection.
 
 **Items Extraction**: In order to extract items from the database of the system to
 generate a dataset with text, images and videos, the following methods should
@@ -47,11 +49,11 @@ be executed, in the following order:
 1. **extract_collection(title, ownerId, start_date=None, end_date=None)**
 
     * It extracts the items of a given collection.
-    * Dates parameters: they are explained in the description of
+    * Dates parameters: they are explained in the des cription of
     the method collection_item_count().
     * Currently, only original items are extracted.
 
-1. **media_csv_download(csvfile, type_file="", directory=".")**
+1. **def media_csv_download(csvfile, type_file="", directory=".", csvset="set_links.csv")**
 
     * Given the csv file, which contains social media items that have images or
     videos related to, try to download these images or Videos.
@@ -61,6 +63,8 @@ be executed, in the following order:
     named image.csv or video.csv.
     * The directory that the media is saved is directory/image and
     directory/video (it depends on the type).
+    * csvset is used to avoid keep trying to download the same link
+    in the scrap_link() function.
 
 
 1. **scrap_link(link, it, csvfile="links.csv")**

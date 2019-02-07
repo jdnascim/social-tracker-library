@@ -613,7 +613,7 @@ def __accountMatch(uid, accounts):
 
 
 def __item_query(title, ownerId, start_date=None, end_date=None,
-                 original=True):
+                 original=True, logfile=None):
     """ given the name of a colleciton, its owner and start/end date, returns
         the query to pass as parameter of db.Collection.Find() """
 
@@ -624,6 +624,31 @@ def __item_query(title, ownerId, start_date=None, end_date=None,
                                             "ownerId": ownerId,
                                             "title": title
                                              })[0]
+
+    # write log if specified
+    if logfile != "" and logfile is not None:
+        # remove unnecessary fields to the logfile
+        del collection_settings['_id']
+        del collection_settings['status']
+        del collection_settings['ownerId']
+
+        # turn dates into readable format
+        collection_settings['creationDate'] = str(__tmiles2date(collection_settings['creationDate']))
+        collection_settings['updateDate'] = str(__tmiles2date(collection_settings['updateDate']))
+
+        if start_date != None:
+            collection_settings['since'] = start_date
+        else:
+            collection_settings['since'] = str(__tmiles2date(collection_settings['since']))
+
+        if end_date != None:
+            collection_settings['until'] = end_date
+
+        collection_settings['original'] = original
+
+        with open(logfile, "w") as logf:
+            logf.write(json.dumps(collection_settings, indent=2))
+
 
     # generate the query
     items_query = dict()
@@ -660,13 +685,13 @@ def collection_item_count(title, ownerId, start_date=None, end_date=None,
 
 
 def __collectionContentGenerator(title, ownerId, start_date=None,
-                                 end_date=None):
+                                 end_date=None, logfile=""):
     """ generator of the content of a given collection """
 
     # connection with Mongo
     db_m = __demoConnection()
 
-    item_query = __item_query(title, ownerId, start_date, end_date)
+    item_query = __item_query(title, ownerId, start_date, end_date, logfile=logfile)
 
     items = db_m.Item.find(item_query)
 
@@ -727,7 +752,6 @@ def __items_tags_facet_query(title, ownerId, start_date=None, end_date=None,
         if list_facet_tags[i]["tags"] == __strip_accents(list_facet_tags[i]["tags"]):
             stressRemDict[list_facet_tags[i]["tags"]] = i
         list_facet_tags[i]["variant_keys"] = []
-
 
     for i in range(len(list_facet_tags)):
         tsr = __strip_accents(list_facet_tags[i]["tags"])
@@ -791,8 +815,7 @@ def __expand_url_links(link_list="link_list.csv"):
 
 
 def extract_collection(title, ownerId, start_date=None, end_date=None):
-    """ extracts items from a given collection, plus generates scripts to
-    download media """
+    """ extracts items from a given collection, and organizes it in files """
 
     # creates dir where things are going to be stored
     directory = str(title) + "_" + str(ownerId)
@@ -803,6 +826,7 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
     __createDir(directory + "/Images")
     __createDir(directory + "/Videos")
     __createDir(directory + "/Links")
+
 
     # header of the csv files
     head = ["csvid", "text", "location", "pubtime", "tags", "media"]
@@ -828,7 +852,7 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
     # csv file the main attributes
     items_count = 0
 
-    items = __collectionContentGenerator(title, ownerId, start_date, end_date)
+    items = __collectionContentGenerator(title, ownerId, start_date, end_date, logfile=directory+ "/logfile.json")
 
     for it in items:
 
@@ -1069,7 +1093,8 @@ def __full_tweet_text(link_t):
     return "".join(text)
 
 
-def query_expansion_tags(title, ownerId, start_date=None, end_date=None, original=True, tag_min_frequency=0.005, ask_conf=True):
+def query_expansion_tags(title, ownerId, start_date=None, end_date=None,
+                         original=True, tag_min_frequency=0.005, ask_conf=True):
     """ applies query expansion related to tags """
 
     if end_date is None:
