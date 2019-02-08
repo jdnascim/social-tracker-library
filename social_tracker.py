@@ -429,11 +429,11 @@ def merge_media(csvimage="image.csv", csvvideo="video.csv",
     print('\x1b[6;30;42m' + "Done." + '\x1b[0m')
 
 
-def __youtube_download(link, output=None, noplaylist=True):
+def __youtube_download(link, output=None, noplaylist=True, overwrite=False):
     """ youtube download """
 
     try:
-        if not os.path.isfile(output):
+        if os.path.isfile(output) is False or overwrite is True:
             youtube_dl.YoutubeDL({'outtmpl': output,
                                   'noplaylist': True}).download([link])
 
@@ -456,11 +456,11 @@ def __youtube_download(link, output=None, noplaylist=True):
         pass
 
 
-def __request_download(link, output):
+def __request_download(link, output, overwrite=False):
     """request download"""
 
     try:
-        if not os.path.isfile(output):
+        if os.path.isfile(output) is False or overwrite is True:
             open(output, "wb").write(requests.get(link).content)
 
             if bool(filetype.guess_mime(output)) is True:
@@ -479,7 +479,7 @@ def __request_download(link, output):
         raise
 
 
-def media_csv_download(csvfile, type_file="", directory=".", csvset="set_links.csv"):
+def media_csv_download(csvfile, type_file="", directory="", csvset="", begin=False):
     """ download media from the csv generated
         type parameter: (I)mage or (V)ideo """
 
@@ -495,38 +495,119 @@ def media_csv_download(csvfile, type_file="", directory=".", csvset="set_links.c
         raise ValueError("Parameter type_file/csvfile must be one of %r." %
                          valid_types)
 
-    if directory[-1] == "/":
+    # if the directory was not passed as parameter, assumes the directory as
+    # the same of the csvfile
+    if directory == "":
+        directory = csvfile[:__lastocc(csvfile,"/")]
+        csvfile = csvfile[__lastocc(csvfile,"/")+1:]
+    elif directory[-1] == "/":
         directory = directory[:-1]
+
+    if csvset == "":
+        csvset = directory + "/set_links.csv"
 
     # now it iterates through the csvfile [__csvGenerator()] and download the
     # items [*.download() -> depends on the type specified]
+
+    csvGen = __csvGenerator(directory + "/" + csvfile)
+
+    # if begin = False, try to start from the file where it
+    # stopped in the former iteration
+    medialog_file = directory + "/medialog.json"
+
+    if os.path.isfile(medialog_file) is False:
+        with open(medialog_file, 'w') as medialog:
+            json.dump(dict(), medialog)
+
+    with open(medialog_file, 'r') as logfile:
+        medialog = json.load(logfile)
+
     try:
         if type_file == "i" or type_file == "image":
-            for line in __csvGenerator(directory + "/" + csvfile):
+            if begin == False:
+                if "last_image" in medialog.keys():
+                    last_image = str(medialog["last_image"])
+                    last_image_fl = float(last_image.replace("_","."))
+                else:
+                    last_image = "0_0"
+                    last_image_fl = 0.0
+
+                if last_image_fl > 0.0:
+                    for line in csvGen:
+                        if float(str(line[0]).replace("_",".")) < last_image_fl:
+                            print("Skipping", line[0])
+                        elif float(str(line[0]).replace("_",".")) == last_image_fl:
+                            print("Skipping", line[0])
+                            break
+                        else:
+                            print(float(str(line[0]).replace("_",".")), last_image_fl)
+                            print("Error: Last image in log does not exist - Starting from the beginning")
+                            csvGen = __csvGenerator(directory + "/" + csvfile)
+                            break
+
+            overwrite = True
+
+            for line in csvGen:
                 linkfile = directory + "/Images/" + line[0]
 
-                chk = __request_download(line[7], linkfile)
+                chk = __request_download(line[7], linkfile, overwrite)
+
+                if overwrite is True:
+                    overwrite = False
 
                 if chk is True:
-                    __write_line_b_csv(csvset, [__expandURL(line[7]), line[1], linkfile])
+                    __write_line_b_csv(csvset, [__expandURL(line[7]), line[0], linkfile])
+                    last_image = line[0]
 
         elif type_file == "v" or type_file == "video":
-            for line in __csvGenerator(directory + "/" + csvfile):
+            if begin == False:
+                if "last_video" in medialog.keys():
+                    last_video = str(medialog["last_video"])
+                    last_video_fl = float(last_video.replace("_","."))
+                else:
+                    last_video = "0_0"
+                    last_video_fl = 0.0
+
+                if last_video_fl > 0.0:
+                    for line in csvGen:
+                        if float(str(line[0]).replace("_",".")) < last_video_fl:
+                            print("Skipping", line[0])
+                        elif float(str(line[0]).replace("_",".")) == last_video_fl:
+                            print("Skipping", line[0])
+                            break
+                        else:
+                            print("Error: Last video in log does not exist - Starting from the beginning")
+                            csvGen = __csvGenerator(directory + "/" + csvfile)
+                            break
+
+            overwrite = True
+
+            for line in csvGen:
                 linkfile = directory + "/Videos/" + line[0]
 
-                chk = __youtube_download(line[7], linkfile)
+                chk = __youtube_download(line[7], linkfile, overwrite)
+
+                if overwrite is True:
+                    overwrite = False
 
                 if chk is True:
                     __write_line_b_csv(csvset, [__expandURL(line[7]), line[1], linkfile])
+                    last_video = line[0]
     # PRÓXIMO PASSOS:
     # - CASO ESTEJA OK, IMPLEMENTAR AS ALTERAÇÕES NECESSÁRIAS PARA O DOWNLOAD
     #   REFERENTE A LINKS
     # - VERIFICAR A QUESTÃO DA BIBLIOTECA ARTICLE - TALVEZ IMPLEMENTAR
     except KeyboardInterrupt:
         print("\nStopping...")
+
+        # set last item succesfully downloaded in the medialog file:
+        if type_file == "i" or type_file == "image":
+            __add_keyval_json("last_image", last_image, medialog_file)
+        elif type_file == "v" or type_file == "video":
+            __add_keyval_json("last_video", last_video, medialog_file)
     except Exception as e:
         print(e)
-        raise
+            raise
 
 
 def list_collections():
@@ -670,6 +751,18 @@ def __item_query(title, ownerId, start_date=None, end_date=None,
         items_query["publicationTime"] = {"$lte": __date2tmiles(end_date)}
 
     return items_query
+
+
+def __add_keyval_json(key, value, logfile):
+    """ add a key-value to a json file """
+
+    with open(logfile) as f:
+        data = json.load(f)
+
+    data[key] = value
+
+    with open(logfile, 'w') as f:
+        json.dump(data, f, indent=2)
 
 
 def collection_item_count(title, ownerId, start_date=None, end_date=None,
@@ -852,7 +945,7 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
     # csv file the main attributes
     items_count = 0
 
-    items = __collectionContentGenerator(title, ownerId, start_date, end_date, logfile=directory+ "/logfile.json")
+    items = __collectionContentGenerator(title, ownerId, start_date, end_date, logfile=directory+ "/collection_log.json")
 
     for it in items:
 
