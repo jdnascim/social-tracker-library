@@ -607,7 +607,7 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="", begin=Fal
             __add_keyval_json("last_video", last_video, medialog_file)
     except Exception as e:
         print(e)
-            raise
+        raise
 
 
 def list_collections():
