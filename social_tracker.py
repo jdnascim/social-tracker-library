@@ -593,10 +593,6 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="", begin=Fal
                 if chk is True:
                     __write_line_b_csv(csvset, [__expandURL(line[7]), line[1], linkfile])
                     last_video = line[0]
-    # PRÓXIMO PASSOS:
-    # - CASO ESTEJA OK, IMPLEMENTAR AS ALTERAÇÕES NECESSÁRIAS PARA O DOWNLOAD
-    #   REFERENTE A LINKS
-    # - VERIFICAR A QUESTÃO DA BIBLIOTECA ARTICLE - TALVEZ IMPLEMENTAR
     except KeyboardInterrupt:
         print("\nStopping...")
 
@@ -922,7 +918,7 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
 
 
     # header of the csv files
-    head = ["csvid", "text", "location", "pubtime", "tags", "media"]
+    head = ["csvid", "text", "location", "pubtime", "tags", "media", "source", "itemUrl"]
     head_media = ["name", "csvid", "text", "location", "pubtime", "tags",
                   "source", "url"]
 
@@ -956,7 +952,7 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
 
         # if the fields exists in the json, write it on csv
         for field in ["title", "location", "publicationTime", "tags",
-                      "mediaIds", "links"]:
+                      "mediaIds", "links", "source", "pageUrl"]:
 
             if field in it:
                 # convert data into human-readable format
@@ -1009,7 +1005,7 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
 
         __write_line_b_csv(directory + "/items.csv", line)
 
-    print("100.0\% completed.")
+    print("100.0% completed.")
 
 
 def create_collection(title, ownerId, keywords):
@@ -1115,21 +1111,19 @@ def __reduced_text(text):
     """ returns True if the twitter item (text) likely has more that 140
     character (details about it in the expand_text description)"""
 
-    if len(text) >= 140 and "..." in text:
+    if "…http" in text.replace(" ", ""):
         return True
     else:
         return False
 
 
-def expand_texts(csvitems="items.csv", csvlinks="link_list.csv"):
-    """ when a twitter item has more that 140 characters, only 140 characters
-    are stored in the database, and a link to the tweet is stored in the
-    "links" field. Obviously, if only a partial text is in the database, only
-    this partial text is going to be in the csv file. This functions aims to
-    scrap the full text of these items using the link to the tweet."""
+def expand_texts(csvitems="items.csv"):
+    """ Sometimes, a Twitter item's text is not entirely stored in the
+        database. This function aims to scrap the tweet url in order to
+        get the full text """
 
-    LINK_PATTERN = "https://twitter.com/i/web/status/"
 
+    # PRE: determine the directory and the name of the file of augmented texts
     last_dot = __lastocc(csvitems, ".")
 
     if last_dot == -1:
@@ -1137,30 +1131,17 @@ def expand_texts(csvitems="items.csv", csvlinks="link_list.csv"):
 
     AUG_IT = csvitems[:last_dot] + "_AUG_TEXT" + csvitems[last_dot:]
 
-    # STEP 1: Verify which items may need an text expansion
-    texts_dict = dict()
-
-    for it in __csvGenerator(csvitems):
-        if __reduced_text(it[1]):
-            texts_dict[int(it[0])] = ""
-
-    # STEP 2: Get the text of these items
-    for lnk in __csvGenerator(csvlinks):
-        if int(lnk[1]) in texts_dict.keys() and lnk[0][:33] == LINK_PATTERN:
-
-            texts_dict[int(lnk[1])] = int(lnk[0][33:])
-
-    # STEP 3: Create a new item file
+    # write the header in the new file
     itemsgen = __csvGenerator(csvitems)
-
-    # Write the header in the new file
     __write_line_b_csv(AUG_IT, next(itemsgen), True)
 
+    # for each item, verify if its text should be expanded
     for it in itemsgen:
-        if int(it[0]) in texts_dict.keys():
-            full_text = __full_tweet_text(LINK_PATTERN + str(texts_dict[int(it[0])]))
+        if __reduced_text(it[1]):
+            full_text = __full_tweet_text(it[1][__lastocc(it[1],"…")+1:].strip())
 
-            if len(full_text) > len(it[1]):
+            if full_text != "":
+                # write the expanded text
                 __write_line_b_csv(AUG_IT, it[:1] + [full_text] + it[2:])
                 print(it[0], full_text)
             else:
@@ -1174,16 +1155,21 @@ def __full_tweet_text(link_t):
     """ given a link to a tweet, extract its entire text. It is necessary for
     twitter items which has more than 140 characters """
 
-    page = requests.get(link_t)
-    tree = html.fromstring(page.content)
-    text = tree.xpath('//div[contains(@class, "permalink-tweet-container")]//p[contains(@class, "tweet-text")]//text()')
+    try:
+        page = requests.get(link_t)
+        tree = html.fromstring(page.content)
+        text = tree.xpath('//div[contains(@class, "permalink-tweet-container")]//p[contains(@class, "tweet-text")]//text()')
 
-    for i in range(len(text)):
-        if text[i][:4] == "pic." or text[i][:7] == "http://" or text[i][:4] == "www." or text[i][:8] == "https://":
+        for i in range(len(text)):
+            if text[i][:4] == "pic." or text[i][:7] == "http://" or text[i][:4] == "www." or text[i][:8] == "https://":
+                text[i] = " " + text[i]
+            if text[i] == "\xa0" or text[i] == "…":
+                text[i] = ""
 
-            text[i] = " " + text[i]
-
-    return "".join(text)
+        return "".join(text)
+    except Exception as e:
+        print(e)
+        return ""
 
 
 def query_expansion_tags(title, ownerId, start_date=None, end_date=None,
