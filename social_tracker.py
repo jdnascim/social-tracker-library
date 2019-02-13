@@ -759,8 +759,11 @@ def __item_query(title, ownerId, start_date=None, end_date=None,
 def __add_keyval_json(key, value, jsonfile):
     """ add a key-value to a json file """
 
-    with open(jsonfile) as f:
-        data = json.load(f)
+    if os.path.isfile(jsonfile):
+        with open(jsonfile) as f:
+            data = json.load(f)
+    else:
+        data = dict()
 
     data[key] = value
 
