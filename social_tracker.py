@@ -479,7 +479,7 @@ def __request_download(link, output, overwrite=False):
         raise
 
 
-def media_csv_download(csvfile, type_file="", directory="", csvset="", begin=False):
+def media_csv_download(csvfile, type_file="", directory="", csvset="", from_beginning=False):
     """ download media from the csv generated
         type parameter: (I)mage or (V)ideo """
 
@@ -559,6 +559,9 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="", begin=Fal
                     __write_line_b_csv(csvset, [__expandURL(line[7]), line[0], linkfile])
                     last_image = line[0]
 
+            # set the last image downloaded after the end of the loop
+            __add_keyval_json("last_image", last_image, medialog_file)
+
         elif type_file == "v" or type_file == "video":
             if begin == False:
                 if "last_video" in medialog.keys():
@@ -592,7 +595,11 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="", begin=Fal
 
                 if chk is True:
                     __write_line_b_csv(csvset, [__expandURL(line[7]), line[1], linkfile])
+
                     last_video = line[0]
+
+            # set the last video downloaded after the end of the loop
+            __add_keyval_json("last_video", last_video, medialog_file)
     except KeyboardInterrupt:
         print("\nStopping...")
 
@@ -749,16 +756,28 @@ def __item_query(title, ownerId, start_date=None, end_date=None,
     return items_query
 
 
-def __add_keyval_json(key, value, logfile):
+def __add_keyval_json(key, value, jsonfile):
     """ add a key-value to a json file """
 
-    with open(logfile) as f:
+    with open(jsonfile) as f:
         data = json.load(f)
 
     data[key] = value
 
-    with open(logfile, 'w') as f:
+    with open(jsonfile, 'w') as f:
         json.dump(data, f, indent=2)
+
+
+def __read_keyval_json(key, jsonfile):
+    """ read a key-value of a json file"""
+
+    with open(jsonfile) as f:
+        data = json.load(f)
+
+    if key in data.keys():
+        return data[key]
+    else:
+        return ""
 
 
 def collection_item_count(title, ownerId, start_date=None, end_date=None,
@@ -1117,7 +1136,7 @@ def __reduced_text(text):
         return False
 
 
-def expand_texts(csvitems="items.csv"):
+def expand_texts(csvitems="items.csv", medialog_file="", from_beginning=False):
     """ Sometimes, a Twitter item's text is not entirely stored in the
         database. This function aims to scrap the tweet url in order to
         get the full text """
@@ -1131,24 +1150,70 @@ def expand_texts(csvitems="items.csv"):
 
     AUG_IT = csvitems[:last_dot] + "_AUG_TEXT" + csvitems[last_dot:]
 
+    # find the log_file
+    if medialog_file == "":
+        directory = csvitems[:__lastocc(csvitems,"/")]
+        medialog_file = directory + "/medialog.json"
+
     # write the header in the new file
     itemsgen = __csvGenerator(csvitems)
-    __write_line_b_csv(AUG_IT, next(itemsgen), True)
+
+    # reach the items generator to the start point (according to whether it
+    # should start from the beginning or not)
+    if from_beginning is False and os.path.isfile(AUG_IT) is True:
+        last_text = __read_keyval_json("last_text", medialog_file)
+
+        if last_text != "":
+
+            last_text = int(last_text)
+            error = False
+            for it in itemsgen:
+                if int(it[0]) == last_text:
+                    print("Starting from item:", last_text + 1)
+                    break
+                elif int(it[0]) > last_text:
+                    print("LOGFILE ERROR - Starting from the beginning")
+                    error = True
+                    break
+
+            if error is True:
+                itemsgen = __csvGenerator(csvitems)
+                next(itemsgen)
+        else:
+            last_text = 0
+    else:
+        # write header of csvitem into csvitem_AUG
+        __write_line_b_csv(AUG_IT, next(csv.reader(open(csvitems, "r"))), True)
+        last_text = 0
 
     # for each item, verify if its text should be expanded
-    for it in itemsgen:
-        if __reduced_text(it[1]):
-            full_text = __full_tweet_text(it[1][__lastocc(it[1],"…")+1:].strip())
+    try:
+        for it in itemsgen:
+            if __reduced_text(it[1]):
+                full_text = __full_tweet_text(it[1][__lastocc(it[1],"…")+1:].strip())
 
-            if full_text != "":
-                # write the expanded text
-                __write_line_b_csv(AUG_IT, it[:1] + [full_text] + it[2:])
-                print(it[0], full_text)
+                if full_text != "":
+                    # write the expanded text
+                    __write_line_b_csv(AUG_IT, it[:1] + [full_text] + it[2:])
+                    print(it[0], full_text)
+                else:
+                    __write_line_b_csv(AUG_IT, it)
+                    print(it[0], it[1])
             else:
                 __write_line_b_csv(AUG_IT, it)
-                print(it[0], it[1])
-        else:
-            __write_line_b_csv(AUG_IT, it)
+
+            last_text = it[0]
+
+        # set the last text after finish the loop.
+        __add_keyval_json("last_text", last_text, medialog_file)
+    except KeyboardInterrupt:
+        print("\nStopping...")
+
+        # set last verified text in the medialog file:
+        __add_keyval_json("last_text", last_text, medialog_file)
+    except Exception as e:
+        print(e)
+        raise
 
 
 def __full_tweet_text(link_t):
