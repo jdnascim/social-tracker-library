@@ -1153,10 +1153,14 @@ def collection_add_keywords(title, ownerId, new_keywords):
 
 
 def __reduced_text(text):
-    """ returns True if the twitter item (text) likely has more that 140
-    character (details about it in the expand_text description)"""
+    """ returns True if the twitter item probably is shortened.
+        Once the criterium was a little bit more complex, this
+        is the reason why a nowadays quite simple function
+        like this one was developed """
 
-    if "…http" in text.replace(" ", ""):
+    #if "…http" in text.replace(" ", ""):
+
+    if "…" in text:
         return True
     else:
         return False
@@ -1217,7 +1221,9 @@ def expand_texts(csvitems="items.csv", medialog_file="", from_beginning=False):
         #TODO - Add %
         for it in itemsgen:
             if __reduced_text(it[1]):
-                full_text = __full_tweet_text(it[1][__lastocc(it[1],"…")+1:].strip())
+                #full_text = __full_tweet_text(it[1][__lastocc(it[1],"…")+1:].strip()
+                #print(it[8])
+                full_text = __full_tweet_text(it[8])
 
                 if full_text != "":
                     # write the expanded text
