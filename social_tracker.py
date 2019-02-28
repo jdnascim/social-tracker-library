@@ -518,7 +518,7 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="", from_begi
 
     csvGen = __csvGenerator(directory + "/" + csvfile)
 
-    # if begin = False, try to start from the file where it
+    # if from_beginning = False, try to start from the file where it
     # stopped in the former iteration
     medialog_file = directory + "/medialog.json"
 
@@ -532,7 +532,7 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="", from_begi
     #TODO Add % completed
     try:
         if type_file == "i" or type_file == "image":
-            if begin == False:
+            if from_beginning == False:
                 if "last_image" in medialog.keys():
                     last_image = str(medialog["last_image"])
                     last_image_fl = float(last_image.replace("_","."))
@@ -571,7 +571,7 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="", from_begi
             __add_keyval_json("last_image", last_image, medialog_file)
 
         elif type_file == "v" or type_file == "video":
-            if begin == False:
+            if from_beginning == False:
                 if "last_video" in medialog.keys():
                     last_video = str(medialog["last_video"])
                     last_video_fl = float(last_video.replace("_","."))
