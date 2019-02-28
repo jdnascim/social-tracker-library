@@ -16,6 +16,10 @@ import youtube_dl
 import redis
 import json
 import time
+import string
+import operator
+import itertools
+import twokenize
 from dateutil import parser
 from pymongo import MongoClient
 from skimage.measure import compare_ssim
@@ -271,6 +275,9 @@ def __link_file_unique(file, it, path):
 
 def __date2tmiles(dat):
     """ return timemiles from a date at the same format used in the system """
+
+    #TODO: require YYYY-MM-DD format
+
     return int(parser.parse(str(dat)).strftime("%s")) * 1000
 
 
@@ -522,6 +529,7 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="", from_begi
     with open(medialog_file, 'r') as logfile:
         medialog = json.load(logfile)
 
+    #TODO Add % completed
     try:
         if type_file == "i" or type_file == "image":
             if begin == False:
@@ -710,7 +718,8 @@ def __item_query(title, ownerId, start_date=None, end_date=None,
                                              })[0]
 
     # write log if specified
-    if logfile != "" and logfile is not None:
+    if bool(logfile) is True:
+
         # remove unnecessary fields to the logfile
         del collection_settings['_id']
         del collection_settings['status']
@@ -732,7 +741,6 @@ def __item_query(title, ownerId, start_date=None, end_date=None,
 
         with open(logfile, "w") as logf:
             logf.write(json.dumps(collection_settings, indent=2))
-
 
     # generate the query
     items_query = dict()
@@ -772,7 +780,7 @@ def __add_keyval_json(key, value, jsonfile):
 
 
 def __read_keyval_json(key, jsonfile):
-    """ read a key-value of a json file"""
+    """ read a key-value of a json file  """
 
     with open(jsonfile) as f:
         data = json.load(f)
@@ -796,7 +804,7 @@ def collection_item_count(title, ownerId, start_date=None, end_date=None,
 
 
 def __collectionContentGenerator(title, ownerId, start_date=None,
-                                 end_date=None, logfile=""):
+                                 end_date=None, logfile=None):
     """ generator of the content of a given collection """
 
     # connection with Mongo
@@ -913,7 +921,7 @@ def __expand_url_links(link_list="link_list.csv"):
     link """
 
     try:
-        __write_line_b_csv(link_list + "_tmp", ["link", "store"], newfile=True)
+        __write_line_b_csv(link_list + "_tmp", ["link", "csvid_dir"], newfile=True)
 
         for line in __csvGenerator(link_list):
             url_line = __expandURL(line[0])
@@ -944,7 +952,7 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
     head_media = ["name", "csvid", "text", "location", "pubtime", "tags",
                   "source", "url"]
 
-    head_list = ["link", "store"]
+    head_list = ["link", "csvid_dir"]
 
     head_set_links = ["link", "item_id", "path"]
 
@@ -1085,13 +1093,28 @@ def __csv_to_dict(csvfile, id_key, id_value):
 
     csvgen = __csvGenerator(csvfile)
 
-    next(csvgen)
     csvdict = dict()
 
     for row in csvgen:
         csvdict[row[id_key]] = row[id_value]
 
+    #TODO if every key is digit, turn into int
+    #TODO id_value should be a list of index
+    #TODO increment delimiter parameter (delimiter=',')
+
     return csvdict
+
+
+def collection_keywords_list(title, ownerId):
+    """ list the keywords of a given collection """
+    db_m = __demoConnection()
+
+    keys = db_m.Collection.find_one({'title': title,
+                                     'ownerId': ownerId})["keywords"]
+
+    keys_l = [k['keyword'] for k in keys]
+
+    return keys_l
 
 
 def collection_add_keywords(title, ownerId, new_keywords):
@@ -1191,6 +1214,7 @@ def expand_texts(csvitems="items.csv", medialog_file="", from_beginning=False):
 
     # for each item, verify if its text should be expanded
     try:
+        #TODO - Add %
         for it in itemsgen:
             if __reduced_text(it[1]):
                 full_text = __full_tweet_text(it[1][__lastocc(it[1],"…")+1:].strip())
@@ -1209,6 +1233,7 @@ def expand_texts(csvitems="items.csv", medialog_file="", from_beginning=False):
 
         # set the last text after finish the loop.
         __add_keyval_json("last_text", last_text, medialog_file)
+        print("Finished")
     except KeyboardInterrupt:
         print("\nStopping...")
 
@@ -1216,7 +1241,40 @@ def expand_texts(csvitems="items.csv", medialog_file="", from_beginning=False):
         __add_keyval_json("last_text", last_text, medialog_file)
     except Exception as e:
         print(e)
+        __add_keyval_json("last_text", last_text, medialog_file)
         raise
+
+
+def __cleanText(text):
+    """ given raw text, return clean text, following the same procedure
+    which is done by the stream manager """
+
+    # 1 - clean
+    text = unicodedata.normalize("NFD", text)
+    text = re.sub(r"\\p{Cntrl}", "", text)
+    text = re.sub(r"\\n", " ", text)
+    text = re.sub(r"\\.{2,}", ". ", text)
+
+    # 2 - toLowerCase
+    text = text.lower()
+
+    # 2.5 - remove retweet indication
+    if text.startswith("rt @"):
+        ssp = text[3:].find(" ")
+        text = text[ssp+4:]
+
+    # 3 - normalize
+    text = re.sub(r"i'm", "i am", text);
+    text = re.sub(r"it's", "it is", text);
+    text = re.sub(r"what's", "what is", text);
+    text = re.sub(r"don't", "do not", text);
+    text = re.sub(r"dont ", "do not ", text);
+
+    # 4 - join tokens
+    tokens = twokenize.tokenize(text)
+    tokens = [t for t in tokens if not (t.startswith("https://") or t in string.punctuation)]
+
+    return " ".join(tokens)
 
 
 def __full_tweet_text(link_t):
@@ -1260,8 +1318,13 @@ def query_expansion_tags(title, ownerId, start_date=None, end_date=None,
 
         i = 0
 
+        if tag_min_frequency < 1:
+            min_qtde = ct*tag_min_frequency
+        else:
+            min_qtde = math.pow(ct, 1/tag_min_frequency)
+
         while (i < len(list_facet_tags)
-               and list_facet_tags[i]["count"]/ct >= tag_min_frequency):
+               and list_facet_tags[i]["count"] >= min_qtde):
 
             if ask_conf is False:
                 new_keywords.append(list_facet_tags[i]["tags"])
@@ -1281,3 +1344,130 @@ def query_expansion_tags(title, ownerId, start_date=None, end_date=None,
         collection_add_keywords(title, ownerId, new_keywords)
     else:
         print("Empty Collection")
+
+
+def query_expansion_hashtags(title, ownerId, start_date=None, end_date=None,
+                         original=True, hashtag_min_frequency=0.005, ask_conf=True):
+    """ applies query expansion related to #hashtags only """
+
+    if end_date is None:
+        end_date = datetime.datetime.now()
+
+    time.sleep(2)
+
+    ct = collection_item_count(title, ownerId, start_date, end_date)
+
+    if hashtag_min_frequency < 1:
+        min_qtde = ct*hashtag_min_frequency
+    else:
+        min_qtde = math.pow(ct, 1/hashtag_min_frequency)
+
+    hashtags_raw = dict()
+
+    # extract the hashtags from the texts
+    for it in __collectionContentGenerator(title, ownerId, start_date, end_date, original):
+        for word in it["cleanTitle"].split(" "):
+            if word.startswith("#"):
+                if word in hashtags_raw.keys():
+                    hashtags_raw[word] += 1
+                else:
+                    hashtags_raw[word] = 1
+
+    hashtags = dict()
+
+    # cleaning process
+    for ht_raw in hashtags_raw.keys():
+
+        # remove stresses
+        ht = __strip_accents(ht_raw)
+
+        # remove punctuation
+        ht = ht.strip(string.punctuation + "…")
+
+        # sum up redundancy
+        if ht in hashtags.keys():
+            hashtags[ht] += hashtags_raw[ht_raw]
+        else:
+            hashtags[ht] = hashtags_raw[ht_raw]
+
+    new_keywords = []
+    for ht in sorted(hashtags.items(), key = operator.itemgetter(1), reverse = True):
+        if ht[1] < min_qtde:
+            break
+        if ask_conf is True:
+            if str(input("add " + str(ht[0]) + "? (y/n)\n")) == "y":
+                new_keywords.append(ht[0])
+        else:
+            new_keywords.append(ht[0])
+
+    collection_add_keywords(title, ownerId, new_keywords)
+
+
+def query_expansion_coocurrence_keywords(title, ownerId, start_date=None, end_date=None,
+                         original=True, ask_conf=True):
+    """ add keywords in pair, according to its co-occurence in the texts """
+
+    if end_date is None:
+        end_date = datetime.datetime.now()
+
+    time.sleep(2)
+
+    ct = 0
+
+    keywords = collection_keywords_list(title, ownerId)
+    coocur = dict()
+    freq_k = dict()
+
+    for it in __collectionContentGenerator(title, ownerId, start_date, end_date, original):
+        ct += 1
+
+        if 'tags' in it:
+            tags_l = it['tags']
+            tags_l.sort()
+
+            # remove stresses
+            tags_l = [__strip_accents(k) for k in tags_l]
+
+            # remove punctuation
+            tags_l = [k.strip(string.punctuation + "…") for k in tags_l]
+
+            # to lower
+            tags_l = [k.lower() for k in tags_l]
+
+            tags_s = set(tags_l)
+
+            for k in tags_s:
+                if k in freq_k.keys():
+                    freq_k[k] += 1
+                else:
+                    freq_k[k] = 1
+
+            for pair in itertools.combinations(tags_l, 2):
+                if pair[0] not in keywords and pair[1] not in keywords and str(pair[0] + " " + pair[1]) not in keywords and pair[0] < pair[1]:
+
+                    if pair in coocur.keys():
+                        coocur[pair] += 1
+                    else:
+                        coocur[pair] = 1
+
+            for pair in coocur.keys():
+                freq0 = freq_k[pair[0]]
+                freq1 = freq_k[pair[1]]
+                freq_p = coocur[pair]
+                coocur[pair] = ((((freq0*freq1)**2)*freq_p)/(freq0+freq1))**(1/2)
+
+    count_pair = 0
+    new_keywords = []
+    for it in sorted(coocur.items(), key = operator.itemgetter(1), reverse = True):
+        count_pair += 1
+
+        keyword = str(it[0][0] + " " + it[0][1])
+        if count_pair > 20:
+            break
+        if ask_conf is True:
+            if str(input("add " + keyword + "? (y/n)\n")) == "y":
+                new_keywords.append(keyword)
+        else:
+            new_keywords.append(keyword)
+
+    collection_add_keywords(title, ownerId, new_keywords)
