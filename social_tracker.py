@@ -20,6 +20,7 @@ import string
 import operator
 import itertools
 import twokenize
+from bs4 import BeautifulSoup
 from dateutil import parser
 from pymongo import MongoClient
 from skimage.measure import compare_ssim
@@ -1477,3 +1478,31 @@ def query_expansion_coocurrence_keywords(title, ownerId, start_date=None, end_da
             new_keywords.append(keyword)
 
     collection_add_keywords(title, ownerId, new_keywords)
+
+
+def google_news_full_cover_urls_gen(url):
+    """ given the google news full coverage of an event, get the urls """
+
+    page = 1
+    links = set()
+    length = 0
+
+    if requests.get(url).url.startswith("https://news.google.com/"):
+        while True:
+            html = requests.get(url.format(page))
+            soup = BeautifulSoup(html.content, "html.parser")
+            links.update([a['href'] for a in soup.find_all('a', href=True)])
+
+            if len(links) == length:
+                break
+
+            length = len(links)
+            page += 1
+
+        for link in sorted(links):
+            if link.startswith("./article"):
+                url_real = requests.get("https://news.google.com" + link[1:]).url
+                yield url_real
+    else:
+        print("Not a Google News url")
+        yield ""
