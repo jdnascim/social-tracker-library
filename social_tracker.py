@@ -706,7 +706,7 @@ def __accountMatch(uid, accounts):
 
 
 def __item_query(title, ownerId, start_date=None, end_date=None,
-                 original=True, logfile=None):
+                 original=True):
     """ given the name of a colleciton, its owner and start/end date, returns
         the query to pass as parameter of db.Collection.Find() """
 
@@ -717,31 +717,6 @@ def __item_query(title, ownerId, start_date=None, end_date=None,
                                             "ownerId": ownerId,
                                             "title": title
                                              })[0]
-
-    # write log if specified
-    if bool(logfile) is True:
-
-        # remove unnecessary fields to the logfile
-        del collection_settings['_id']
-        del collection_settings['status']
-        del collection_settings['ownerId']
-
-        # turn dates into readable format
-        collection_settings['creationDate'] = str(__tmiles2date(collection_settings['creationDate']))
-        collection_settings['updateDate'] = str(__tmiles2date(collection_settings['updateDate']))
-
-        if start_date != None:
-            collection_settings['since'] = start_date
-        else:
-            collection_settings['since'] = str(__tmiles2date(collection_settings['since']))
-
-        if end_date != None:
-            collection_settings['until'] = end_date
-
-        collection_settings['original'] = original
-
-        with open(logfile, "w") as logf:
-            logf.write(json.dumps(collection_settings, indent=2))
 
     # generate the query
     items_query = dict()
@@ -805,13 +780,13 @@ def collection_item_count(title, ownerId, start_date=None, end_date=None,
 
 
 def __collectionContentGenerator(title, ownerId, start_date=None,
-                                 end_date=None, logfile=None):
+                                 end_date=None, original=True):
     """ generator of the content of a given collection """
 
     # connection with Mongo
     db_m = __demoConnection()
 
-    item_query = __item_query(title, ownerId, start_date, end_date, logfile=logfile)
+    item_query = __item_query(title, ownerId, start_date, end_date, original)
 
     items = db_m.Item.find(item_query)
 
@@ -972,7 +947,7 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
     # csv file the main attributes
     items_count = 0
 
-    items = __collectionContentGenerator(title, ownerId, start_date, end_date, logfile=directory+ "/collection_log.json")
+    items = __collectionContentGenerator(title, ownerId, start_date, end_date)
 
     for it in items:
 
@@ -1402,6 +1377,7 @@ def query_expansion_hashtags(title, ownerId, start_date=None, end_date=None,
         if ht[1] < min_qtde:
             break
         if ask_conf is True:
+            print(type(ht))
             if str(input("add " + str(ht[0]) + "? (y/n)\n")) == "y":
                 new_keywords.append(ht[0])
         else:
@@ -1480,13 +1456,14 @@ def query_expansion_coocurrence_keywords(title, ownerId, start_date=None, end_da
     collection_add_keywords(title, ownerId, new_keywords)
 
 
-def google_news_full_cover_urls_gen(url):
+def google_news_full_cover_urls(url, real=False):
     """ given the google news full coverage of an event, get the urls """
 
     page = 1
     links = set()
     length = 0
 
+    urls = []
     if requests.get(url).url.startswith("https://news.google.com/"):
         while True:
             html = requests.get(url.format(page))
@@ -1501,8 +1478,15 @@ def google_news_full_cover_urls_gen(url):
 
         for link in sorted(links):
             if link.startswith("./article"):
-                url_real = requests.get("https://news.google.com" + link[1:]).url
-                yield url_real
+                urls.append(link)
     else:
         print("Not a Google News url")
-        yield ""
+
+    Surls = set(urls)
+
+    if real is False:
+        return set(["https://news.google.com" + link[1:] for link in Surls])
+    else:
+        return set([requests.get("https://news.google.com" + link[1:]).url for link in Surls])
+
+    return urls
