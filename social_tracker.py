@@ -50,13 +50,15 @@ def __demoConnection():
     return client.Demo
 
 
-def __csvGenerator(csvfile):
+def __csvGenerator(csvfile, delimiter=",", hide_header=True):
     """ csv generator """
 
     f = open(csvfile, "r")
-    f.readline()
 
-    for line in csv.reader(f):
+    if hide_header is True:
+        f.readline()
+
+    for line in csv.reader(f, delimiter):
         yield line
 
 
@@ -1116,6 +1118,41 @@ def collection_add_keywords(title, ownerId, new_keywords):
 
     db_m.Collection.update_one({'title': title, 'ownerId': ownerId},
                                {'$set': {'keywords': keys}})
+
+    edited_collection = db_m.Collection.find_one({'title': title,
+                                                  'ownerId': ownerId})
+
+    with open(__CONF_FILE, 'r') as fp:
+        conf = json.load(fp)
+
+    r = redis.StrictRedis(host=conf["redis"]["host"],
+                          port=conf["redis"]["port"], db=conf["redis"]["db"])
+    r.publish("collections:edit", json.dumps(edited_collection))
+
+
+def collection_remove_keywords(title, ownerId, keywords):
+    """ remove keywords in a given collection """
+
+    db_m = __demoConnection()
+
+    keys = db_m.Collection.find_one({'title': title,
+                                     'ownerId': ownerId})["keywords"]
+
+    # lower the keywords which should be removed
+    for i in range(len(keywords)):
+        keywords[i] = keywords[i].lower()
+
+    # turn the list into set - to improve performance (theoretically)
+    keywords = set(keywords)
+
+    # create a set in order to not include a duplicate keyword
+    new_keys = list()
+    for k in keys:
+        if k["keyword"].lower() not in keywords:
+            new_keys.append({'keyword': k["keyword"].lower()})
+
+    db_m.Collection.update_one({'title': title, 'ownerId': ownerId},
+                               {'$set': {'keywords': new_keys}})
 
     edited_collection = db_m.Collection.find_one({'title': title,
                                                   'ownerId': ownerId})
