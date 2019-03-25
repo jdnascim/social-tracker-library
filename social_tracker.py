@@ -1090,10 +1090,9 @@ def collection_keywords_list(title, ownerId):
     keys = db_m.Collection.find_one({'title': title,
                                      'ownerId': ownerId})["keywords"]
 
-    keys_l = [k['keyword'] for k in keys]
+    keys_l = [k['keyword'].lower() for k in keys]
 
     return keys_l
-
 
 def collection_add_keywords(title, ownerId, new_keywords):
     """ add new keywords in a given collection """
@@ -1328,6 +1327,9 @@ def query_expansion_tags(title, ownerId, start_date=None, end_date=None,
 
     ct = collection_item_count(title, ownerId, start_date, end_date)
 
+    # current keywords set in the collection - to not suggest these ones
+    current_keys = set(collection_keywords_list(title,ownerId))
+
     if ct > 0:
 
         list_facet_tags = __items_tags_facet_query(title, ownerId, start_date,
@@ -1351,12 +1353,14 @@ def query_expansion_tags(title, ownerId, start_date=None, end_date=None,
                 for k in list_facet_tags[i]["variant_keys"]:
                     new_keywords.append(k)
             else:
-                if str(input("add " + str(list_facet_tags[i]["tags"]) + "? (y/n)\n")) == "y":
-                    new_keywords.append(list_facet_tags[i]["tags"])
+                if list_facet_tags[i]["tags"] not in current_keys:
+                    if str(input("add " + str(list_facet_tags[i]["tags"]) + "? (y/n)\n")) == "y":
+                        new_keywords.append(list_facet_tags[i]["tags"])
 
                 for k in list_facet_tags[i]["variant_keys"]:
-                    if str(input("add variant " + str(k) + "? (y/n)\n")) == "y":
-                        new_keywords.append(k)
+                    if list_facet_tags[i]["variant_keys"] not in current_keys:
+                        if str(input("add variant " + str(k) + "? (y/n)\n")) == "y":
+                            new_keywords.append(k)
 
             i += 1
 
@@ -1375,6 +1379,9 @@ def query_expansion_hashtags(title, ownerId, start_date=None, end_date=None,
     time.sleep(2)
 
     ct = collection_item_count(title, ownerId, start_date, end_date)
+
+    # current keywords set in the collection - to not suggest these ones
+    current_keys = set(collection_keywords_list(title,ownerId))
 
     if hashtag_min_frequency < 1:
         min_qtde = ct*hashtag_min_frequency
@@ -1413,7 +1420,7 @@ def query_expansion_hashtags(title, ownerId, start_date=None, end_date=None,
     for ht in sorted(hashtags.items(), key = operator.itemgetter(1), reverse = True):
         if ht[1] < min_qtde:
             break
-        if ask_conf is True:
+        if ask_conf is True and str(ht[0]) not in current_keys:
             print(type(ht))
             if str(input("add " + str(ht[0]) + "? (y/n)\n")) == "y":
                 new_keywords.append(ht[0])
@@ -1434,7 +1441,7 @@ def query_expansion_coocurrence_keywords(title, ownerId, start_date=None, end_da
 
     ct = 0
 
-    keywords = collection_keywords_list(title, ownerId)
+    current_keywords = set(collection_keywords_list(title, ownerId))
     coocur = dict()
     freq_k = dict()
 
@@ -1463,7 +1470,7 @@ def query_expansion_coocurrence_keywords(title, ownerId, start_date=None, end_da
                     freq_k[k] = 1
 
             for pair in itertools.combinations(tags_l, 2):
-                if pair[0] not in keywords and pair[1] not in keywords and str(pair[0] + " " + pair[1]) not in keywords and pair[0] < pair[1]:
+                if pair[0] not in current_keywords and pair[1] not in current_keywords and str(pair[0] + " " + pair[1]) not in current_keywords and pair[0] < pair[1]:
 
                     if pair in coocur.keys():
                         coocur[pair] += 1
