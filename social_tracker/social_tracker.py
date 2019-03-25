@@ -644,18 +644,17 @@ def list_collections():
         print("")
 
 
-def list_extracted_collections(path=None):
+def list_extracted_collections():
     """ lists every extracted collection in the directory
         configured in __CONF_FILE """
 
     print("List of the extracted collections")
     print()
 
-    if path is None:
-        with open(__CONF_FILE, 'r') as fp:
-            conf = json.load(fp)
+    with open(__CONF_FILE, 'r') as fp:
+        conf = json.load(fp)
 
-        path = conf["collections"]["path"]
+    path = conf["collections"]["path"]
 
     try:
         dir_list = next(os.walk(path))[1]
@@ -1095,7 +1094,6 @@ def collection_keywords_list(title, ownerId):
 
     return keys_l
 
-
 def collection_add_keywords(title, ownerId, new_keywords):
     """ add new keywords in a given collection """
 
@@ -1319,14 +1317,11 @@ def __full_tweet_text(link_t):
 
 
 def query_expansion_tags(title, ownerId, start_date=None, end_date=None,
-                         original=True, tag_min_frequency=2, ask_conf=True):
+                         original=True, tag_min_frequency=0.005, ask_conf=True):
     """ applies query expansion related to tags """
 
     if end_date is None:
         end_date = datetime.datetime.now()
-
-    if tag_min_frequency < 0 or tag_min_frequency is None:
-        tag_min_frequency = 2
 
     time.sleep(2)
 
@@ -1375,14 +1370,11 @@ def query_expansion_tags(title, ownerId, start_date=None, end_date=None,
 
 
 def query_expansion_hashtags(title, ownerId, start_date=None, end_date=None,
-                         original=True, hashtag_min_frequency=3, ask_conf=True):
+                         original=True, hashtag_min_frequency=0.005, ask_conf=True):
     """ applies query expansion related to #hashtags only """
 
     if end_date is None:
         end_date = datetime.datetime.now()
-
-    if hashtag_min_frequency < 0 or hashtag_min_frequency is None:
-        hashtag_min_frequency = 3
 
     time.sleep(2)
 
@@ -1508,7 +1500,7 @@ def query_expansion_coocurrence_keywords(title, ownerId, start_date=None, end_da
     collection_add_keywords(title, ownerId, new_keywords)
 
 
-def google_news_full_cover_urls(url, real_url=False):
+def google_news_full_cover_urls(url, real=False):
     """ given the google news full coverage of an event, get the urls """
 
     page = 1
@@ -1536,7 +1528,7 @@ def google_news_full_cover_urls(url, real_url=False):
 
     Surls = set(urls)
 
-    if real_url is False:
+    if real is False:
         return set(["https://news.google.com" + link[1:] for link in Surls])
     else:
         return set([requests.get("https://news.google.com" + link[1:]).url for link in Surls])
