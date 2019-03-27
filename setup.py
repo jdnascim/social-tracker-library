@@ -11,7 +11,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 setup(
     name='social-tracker-library',  # Required
 
-    version='0.1.8',  # Required
+    version='0.1.9',  # Required
 
     description='Python library to communicate with the Social Tracker application',  # Optional
 
@@ -40,6 +40,7 @@ setup(
     python_requires='>=3.5, <4',
 
     install_requires=['redis', 'twokenize', 'bs4', 'pymongo', 'scikit-image',
-                      'lxml', 'youtube-dl', 'opencv-python', 'filetype']
+                      'lxml', 'youtube-dl', 'opencv-python', 'filetype',
+                      'requests']
 
 )
