@@ -11,7 +11,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 setup(
     name='social-tracker-library',  # Required
 
-    version='0.1.6',  # Required
+    version='0.1.7',  # Required
 
     description='Python library to communicate with the Social Tracker application',  # Optional
 
