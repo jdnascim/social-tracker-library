@@ -72,4 +72,4 @@ def query_expansion(title, ownerId, type="tags", start_date=None, end_date=None,
 
 
 def google_news_full_cover_urls(url, real_url=False):
-    st.google_news_full_cover_urls(url=, real_url)
+    st.google_news_full_cover_urls(url, real_url)
