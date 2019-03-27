@@ -62,11 +62,11 @@ def query_expansion(title, ownerId, type="tags", start_date=None, end_date=None,
         st.query_expansion_tags(title, ownerId, start_date, end_date,
                                  original, rate, ask_conf)
 
-    elif type: "hashtags":
+    elif type == "hashtags":
         st.query_expansion_hashtags(title, ownerId, start_date, end_date,
                                  original, rate, ask_conf)
 
-    elif type: "coocurrence":
+    elif type == "coocurrence":
         st.query_expansion_coocurrence_keywords(title, ownerId, start_date,
                                                 end_date, original, ask_conf):
 
