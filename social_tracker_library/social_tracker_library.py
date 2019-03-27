@@ -58,7 +58,7 @@ def __csvGenerator(csvfile, delimiter=",", hide_header=True):
     if hide_header is True:
         f.readline()
 
-    for line in csv.reader(f, delimiter):
+    for line in csv.reader(f, delimiter=delimiter):
         yield line
 
 
