@@ -68,7 +68,7 @@ def query_expansion(title, ownerId, type="tags", start_date=None, end_date=None,
 
     elif type == "coocurrence":
         st.query_expansion_coocurrence_keywords(title, ownerId, start_date,
-                                                end_date, original, ask_conf):
+                                                end_date, original, ask_conf)
 
 
 def google_news_full_cover_urls(url, real_url=False):
