@@ -9,6 +9,6 @@ setup(name='social-tracker-library',
       author_email='jose.dori.nascimento@gmail.com',
       url='https://github.com/jdnascim/social-tracker-library'
       packages=['social_tracker'],
-      install_requires=[redis, twokenize, bs4, pymongo, scikit-image, lxml,
-                        youtube-dl, opencv-python]
+      #install_requires=[redis, twokenize, bs4, pymongo, scikit-image, lxml,
+                    #youtube-dl, opencv-python]
      )
