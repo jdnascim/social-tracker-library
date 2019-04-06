@@ -31,7 +31,7 @@ from lxml import html
 __SSIM_THRESHOLD = 0.97
 
 # conf file
-__CONF_FILE = "conf.json"
+__CONF_FILE = os.path.dirname(os.path.realpath(__file__)) + "conf.json"
 
 
 def __demoConnection():
