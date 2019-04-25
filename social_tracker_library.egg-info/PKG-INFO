@@ -1,0 +1,20 @@
+Metadata-Version: 2.1
+Name: social-tracker-library
+Version: 0.1.10
+Summary: Python library to communicate with the Social Tracker application
+Home-page: https://github.com/jdnascim/social-tracker-library
+Author: José Nascimento
+Author-email: jose [DOT] dori [DOT] nascimento [AT] gmail [DOT] com
+License: UNKNOWN
+Description: # social-tracker-library
+        Python library to work with social tracker (https://github.com/MKLab-ITI/mmdemo-dockerized)
+
+        Description of the main methods soon
+
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Users of the Social Tracker Application
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3.7
+Requires-Python: >=3.5, <4
+Description-Content-Type: text/markdown

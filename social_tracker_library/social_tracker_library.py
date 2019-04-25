@@ -31,7 +31,7 @@ from lxml import html
 __SSIM_THRESHOLD = 0.97
 
 # conf file
-__CONF_FILE = os.path.dirname(os.path.realpath(__file__)) + "conf.json"
+__CONF_FILE = os.path.dirname(os.path.realpath(__file__)) + "/" + "conf.json"
 
 
 def __demoConnection():
@@ -489,7 +489,8 @@ def __request_download(link, output, overwrite=False):
         raise
 
 
-def media_csv_download(csvfile, type_file="", directory="", csvset="", from_beginning=False):
+def media_csv_download(csvfile, type_file="", directory="", csvset="",
+                       from_beginning=False):
     """ download media from the csv generated
         type parameter: (I)mage or (V)ideo """
 
@@ -497,7 +498,7 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="", from_begi
 
     # if type not specified, get the type by the name of the csvfile
     if type_file == "":
-        type_file = csvfile[:__lastocc(csvfile, ".")]
+        type_file = csvfile[__lastocc(csvfile,"/")+1:__lastocc(csvfile, ".")]
 
     type_file = type_file.lower()
 
@@ -545,12 +546,10 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="", from_begi
 
                 if last_image_fl > 0.0:
                     for line in csvGen:
-                        if float(str(line[0]).replace("_",".")) < last_image_fl:
-                            print("Skipping", line[0])
-                        elif float(str(line[0]).replace("_",".")) == last_image_fl:
-                            print("Skipping", line[0])
+                        if float(str(line[0]).replace("_",".")) == last_image_fl:
+                            print("Skipping until", line[0])
                             break
-                        else:
+                        elif float(str(line[0]).replace("_",".")) > last_image_fl:
                             print(float(str(line[0]).replace("_",".")), last_image_fl)
                             print("Error: Last image in log does not exist - Starting from the beginning")
                             csvGen = __csvGenerator(directory + "/" + csvfile)
@@ -561,14 +560,17 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="", from_begi
             for line in csvGen:
                 linkfile = directory + "/Images/" + line[0]
 
-                chk = __request_download(line[7], linkfile, overwrite)
+                try:
+                    chk = __request_download(line[7], linkfile, overwrite)
 
-                if overwrite is True:
-                    overwrite = False
+                    if overwrite is True:
+                        overwrite = False
 
-                if chk is True:
-                    __write_line_b_csv(csvset, [__expandURL(line[7]), line[0], linkfile])
-                    last_image = line[0]
+                    if chk is True:
+                        __write_line_b_csv(csvset, [__expandURL(line[7]), line[0], linkfile])
+                        last_image = line[0]
+                except requests.exceptions.ConnectionError:
+                    continue
 
             # set the last image downloaded after the end of the loop
             __add_keyval_json("last_image", last_image, medialog_file)
@@ -1067,10 +1069,10 @@ def create_collection(title, ownerId, keywords):
     r.publish("collections:new", json.dumps(new_collection))
 
 
-def __csv_to_dict(csvfile, id_key, id_value):
+def __csv_to_dict(csvfile, id_key, id_value, delimiter=','):
     """ given a csv file, return a dict based upon it """
 
-    csvgen = __csvGenerator(csvfile)
+    csvgen = __csvGenerator(csvfile, delimiter=delimiter)
 
     csvdict = dict()
 
@@ -1363,7 +1365,7 @@ def query_expansion_tags(title, ownerId, start_date=None, end_date=None,
                         new_keywords.append(list_facet_tags[i]["tags"])
 
                 for k in list_facet_tags[i]["variant_keys"]:
-                    if list_facet_tags[i]["variant_keys"] not in current_keys:
+                    if k not in current_keys:
                         if str(input("add variant " + str(k) + "? (y/n)\n")) == "y":
                             new_keywords.append(k)
 
