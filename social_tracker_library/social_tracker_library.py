@@ -20,6 +20,7 @@ import string
 import operator
 import itertools
 import twokenize
+from newspaper import Article
 from bs4 import BeautifulSoup
 from dateutil import parser
 from pymongo import MongoClient
@@ -174,18 +175,13 @@ def __write_line_b_csv(csvfile, line, newfile=False):
 
 def __ogImageGenerator(link):
     """ given a link, try to get images from it by the parameter og:image """
+    a = Article(url=link)
+    a.download()
+    a.parse()
+    a.fetch_images()
 
-    text = requests.get(link).text
-    ini = text.find("\"og:image\"")
-    end = 0
-    while ini > -1:
-        ini += 20 + end
-        linklen = text[ini:].find("\"")
-        end = ini + linklen
-
-        yield text[ini:end]
-
-        ini = text[end:].find("\"og:image\"")
+    for img in a.imgs:
+        yield img
 
 
 def __youtube_link_download(link, it, csvfile, path=""):
@@ -586,12 +582,10 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="",
 
                 if last_video_fl > 0.0:
                     for line in csvGen:
-                        if float(str(line[0]).replace("_",".")) < last_video_fl:
-                            print("Skipping", line[0])
-                        elif float(str(line[0]).replace("_",".")) == last_video_fl:
+                        if float(str(line[0]).replace("_",".")) == last_video_fl:
                             print("Skipping", line[0])
                             break
-                        else:
+                        elif float(str(line[0]).replace("_",".")) > last_video_fl:
                             print("Error: Last video in log does not exist - Starting from the beginning")
                             csvGen = __csvGenerator(directory + "/" + csvfile)
                             break

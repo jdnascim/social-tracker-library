@@ -8,3 +8,4 @@ youtube-dl
 opencv-python
 filetype
 requests
+newspaper3k
