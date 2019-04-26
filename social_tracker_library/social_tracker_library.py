@@ -465,7 +465,7 @@ def __youtube_download(link, output=None, noplaylist=True, overwrite=False):
     """ youtube download """
 
     try:
-        if os.path.isfile(output) is False and overwrite is True:
+        if os.path.isfile(output) is False or overwrite is True:
             youtube_dl.YoutubeDL({'outtmpl': output,
                                   'noplaylist': True}).download([link])
 
