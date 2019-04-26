@@ -534,6 +534,10 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="",
     elif sample is not False and sample is not None:
         print("Invalid Sample - Ignoring...")
 
+    # if overwrite True, activate from_beginning
+    if overwrite is True:
+        from_beginning = True
+
     valid_types = {"i", "image", "v", "video"}
 
     # if type not specified, get the type by the name of the csvfile
@@ -605,7 +609,7 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="",
                         if __decision(probability=sample) is False:
                             continue
 
-                    chk = __request_download(line[7], linkfile, overwrite)
+                    chk = __request_download(line[7], linkfile, overwrite=overwrite)
 
                     if chk is True:
                         __write_line_b_csv(csvset, [__expandURL(line[7]), line[0], linkfile])
@@ -645,7 +649,7 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="",
 
                 linkfile = directory + "/Videos/" + line[0]
 
-                chk = __youtube_download(line[7], linkfile, overwrite)
+                chk = __youtube_download(line[7], linkfile, overwrite=overwrite)
 
                 if chk is True:
                     __write_line_b_csv(csvset, [__expandURL(line[7]), line[1], linkfile])
