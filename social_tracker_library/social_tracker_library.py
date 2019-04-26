@@ -302,7 +302,33 @@ def __collection_regstr_query(keywords):
     return re.compile(regstr, re.IGNORECASE)
 
 
-def scrap_link(link, it, csvfile="links.csv"):
+def links_media(csvfile="links.csv"):
+    """ scrap the links """
+
+    try:
+        __createDir("Links/"+it)
+        directory = __link_directory(link, it)
+        __createDir(directory)
+
+        __youtube_link_download(link, it, csvfile)
+
+        for im in __ogImageGenerator(link):
+            __request_link_download(im, it, csvfile, directory)
+
+        print('\x1b[6;30;42m' + "Scrap Finished for Link " + str(it) +
+              '\x1b[0m')
+
+    except KeyboardInterrupt:
+        # if occurs a keyboard interruption, delete all media related to the
+        # given item
+        shutil.rmtree("Links/"+it, ignore_errors=True)
+        __csv_del_inconsistent_rows(csvfile)
+        raise
+    except Exception as e:
+        print(e)
+
+
+def __scrap_link(link, it, csvfile="links.csv"):
     """ given a link, try to get items from this link """
 
     try:
@@ -485,10 +511,28 @@ def __request_download(link, output, overwrite=False):
         raise
 
 
+def __decision(probability):
+    """ returns True or False. Probability defines the chances to this
+        function returns True"""
+
+    return random.random() < probability
+
+
 def media_csv_download(csvfile, type_file="", directory="", csvset="",
-                       from_beginning=False):
+                       from_beginning=False, sample=False, overwrite=False):
     """ download media from the csv generated
-        type parameter: (I)mage or (V)ideo """
+        type parameter: (I)mage or (V)ideo
+        from_beginning: defines if it will start based on the medialog_file
+        sample: if it is a number, download (randomly and approximately) only
+                total*sample items """
+
+    # verify if sample is valid
+    sample_mode = False
+    if type(sample) == float:
+        from_beginning = True
+        sample_mode = True
+    elif sample is not False and sample is not None:
+        print("Invalid Sample - Ignoring...")
 
     valid_types = {"i", "image", "v", "video"}
 
@@ -551,16 +595,17 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="",
                             csvGen = __csvGenerator(directory + "/" + csvfile)
                             break
 
-            overwrite = True
-
             for line in csvGen:
                 linkfile = directory + "/Images/" + line[0]
 
                 try:
-                    chk = __request_download(line[7], linkfile, overwrite)
+                    # if sample mode is set, download only a small number of
+                    # items, based on the sample probability
+                    if sample_mode is True:
+                        if __decision(probability=sample) is False:
+                            continue
 
-                    if overwrite is True:
-                        overwrite = False
+                    chk = __request_download(line[7], linkfile, overwrite)
 
                     if chk is True:
                         __write_line_b_csv(csvset, [__expandURL(line[7]), line[0], linkfile])
@@ -569,7 +614,8 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="",
                     continue
 
             # set the last image downloaded after the end of the loop
-            __add_keyval_json("last_image", last_image, medialog_file)
+            if sample_mode is False:
+                __add_keyval_json("last_image", last_image, medialog_file)
 
         elif type_file == "v" or type_file == "video":
             if from_beginning == False:
@@ -590,15 +636,16 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="",
                             csvGen = __csvGenerator(directory + "/" + csvfile)
                             break
 
-            overwrite = True
-
             for line in csvGen:
+                # if sample mode is set, download only a small number of
+                # items, based on the sample probability
+                if sample_mode is True:
+                    if __decision(probability=sample) is False:
+                        continue
+
                 linkfile = directory + "/Videos/" + line[0]
 
                 chk = __youtube_download(line[7], linkfile, overwrite)
-
-                if overwrite is True:
-                    overwrite = False
 
                 if chk is True:
                     __write_line_b_csv(csvset, [__expandURL(line[7]), line[1], linkfile])
@@ -606,15 +653,17 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="",
                     last_video = line[0]
 
             # set the last video downloaded after the end of the loop
-            __add_keyval_json("last_video", last_video, medialog_file)
+            if sample_mode is False:
+                __add_keyval_json("last_video", last_video, medialog_file)
     except KeyboardInterrupt:
         print("\nStopping...")
 
         # set last item succesfully downloaded in the medialog file:
-        if type_file == "i" or type_file == "image":
-            __add_keyval_json("last_image", last_image, medialog_file)
-        elif type_file == "v" or type_file == "video":
-            __add_keyval_json("last_video", last_video, medialog_file)
+        if sample_mode is False:
+            if type_file == "i" or type_file == "image":
+                __add_keyval_json("last_image", last_image, medialog_file)
+            elif type_file == "v" or type_file == "video":
+                __add_keyval_json("last_video", last_video, medialog_file)
     except Exception as e:
         print(e)
         raise
