@@ -173,7 +173,7 @@ def __write_line_b_csv(csvfile, line, newfile=False):
         wr.writerow(line)
 
 
-def __ogImageGenerator(link):
+def __urlImageGenerator(link):
     """ given a link, try to get images from it by the parameter og:image """
     a = Article(url=link)
     a.download()
@@ -312,7 +312,7 @@ def links_media(csvfile="links.csv"):
 
         __youtube_link_download(link, it, csvfile)
 
-        for im in __ogImageGenerator(link):
+        for im in __urlImageGenerator(link):
             __request_link_download(im, it, csvfile, directory)
 
         print('\x1b[6;30;42m' + "Scrap Finished for Link " + str(it) +
@@ -338,7 +338,7 @@ def __scrap_link(link, it, csvfile="links.csv"):
 
         __youtube_link_download(link, it, csvfile)
 
-        for im in __ogImageGenerator(link):
+        for im in __urlImageGenerator(link):
             __request_link_download(im, it, csvfile, directory)
 
         print('\x1b[6;30;42m' + "Scrap Finished for Link " + str(it) +
