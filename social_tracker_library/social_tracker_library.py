@@ -175,67 +175,16 @@ def __write_line_b_csv(csvfile, line, newfile=False):
 
 def __urlImageGenerator(link):
     """ given a link, try to get images from it by the parameter og:image """
-    a = Article(url=link)
-    a.download()
-    a.parse()
-    a.fetch_images()
-
-    for img in a.imgs:
-        yield img
-
-
-def __youtube_link_download(link, it, csvfile, path=""):
-    """ youtube download given a link
-        used when scraping links (e.g scrap_link)"""
 
     try:
-        name = __namefile(link)
+        a = Article(url=link)
+        a.download()
+        a.parse()
+        a.fetch_images()
 
-        if path == "":
-            path = __link_directory(link, it)
-
-        arq = path + "/" + name
-
-        if not os.path.isfile(arq):
-            __youtube_download(link, arq)
-
-            # -> ["name", "csvid", "source", "type", "path"]
-            kind = __guessTypePath(arq)
-            if kind == "video" or kind == "image":
-                line = [name, str(it), link, kind, arq]
-                __write_line_b_csv(csvfile, line)
-            else:
-                __removeDownloadedFile(arq)
-
-    except Exception:
-        __removeDownloadedFile(arq)
-        pass
-
-
-def __request_link_download(link, it, csvfile, path=""):
-    """ request download given a link
-        used when scraping links (e.g scrap_link)"""
-
-    try:
-        name = __namefile(link)
-
-        if path == "":
-            path = __link_directory(link, it)
-
-        arq = path + "/" + name
-
-        if not os.path.isfile(arq):
-            open(arq, "wb").write(requests.get(link).content)
-
-            # -> ["name", "csvid", "source", "type", "path"]
-            kind = __guessTypePath(arq)
-            if kind == "video" or kind == "image":
-                line = [name, str(it), link, kind, arq]
-                __write_line_b_csv(csvfile, line)
-            else:
-                __removeDownloadedFile(arq)
-    except Exception as e:
-        __removeDownloadedFile(arq)
+        for img in a.imgs:
+            yield img
+    except:
         pass
 
 
@@ -302,56 +251,80 @@ def __collection_regstr_query(keywords):
     return re.compile(regstr, re.IGNORECASE)
 
 
-def links_media(csvfile="links.csv"):
-    """ scrap the links """
+def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
+              urldir="UrlMedia", medialog_file="medialog.json",
+              ignore_twitter_link=True):
+    #### TODO: IMPLEMENT A LOOP WHICH EXECUTES THE METHOD BELOW FOR EACH LINK
+    #### IN THE FILE PASSED AS PARAMETER.
+    root_dir = os.getcwd()
+
+    setUrls = __csv_to_dict(csvset, 1, 0)
+
+    if urldir[-1] == '/':
+        urldir = urldir[:-1]
+
+    seq = ""
+
+    # get next sequence number
+    if os.path.isfile(medialog_file):
+        seq = __read_keyval_json("next_urlSeq", medialog_file)
+
+    # if the parameter does not exist, get the seq from the
+    if seq == "":
+        seq = max([int(d) for d in os.listdir(urldir)] + [0]) + 1
 
     try:
-        __createDir("Links/"+it)
-        directory = __link_directory(link, it)
-        __createDir(directory)
+        seqdir = urldir + "/" + str(seq)
 
-        __youtube_link_download(link, it, csvfile)
+        # iterate through each link
+        for line in __csvGenerator(csvlinks):
+            if "https://twitter.com" in line[0] and ignore_twitter_link:
+                continue
 
-        for im in __urlImageGenerator(link):
-            __request_link_download(im, it, csvfile, directory)
+            url = __expandURL(line[0])
 
-        print('\x1b[6;30;42m' + "Scrap Finished for Link " + str(it) +
-              '\x1b[0m')
+            if url not in setUrls.keys():
+
+                os.mkdir(seqdir)
+                os.chdir(seqdir)
+
+                try:
+                    youtube_dl.YoutubeDL({}).download([url])
+                except youtube_dl.DownloadError:
+                    os.chdir(root_dir)
+                    os.rmtree(seqdir)
+                    continue
+
+                for im in __urlImageGenerator(url):
+                    try:
+                        __request_download(link=im, output=im[__lastocc(im,"/")+1:])
+                    except requests.exceptions.ConnectionError:
+                        continue
+
+                os.chdir(root_dir)
+
+                setUrls[url] = seq
+
+                __write_line_b_csv(csvfile=csvset, line=[seq, url])
+
+                print('\x1b[6;30;42m' + "Scrap Finished for Link " + str(url) +
+                      '\x1b[0m')
+
+                seq += 1
+                seqdir = urldir + "/" + str(seq)
 
     except KeyboardInterrupt:
-        # if occurs a keyboard interruption, delete all media related to the
-        # given item
-        shutil.rmtree("Links/"+it, ignore_errors=True)
-        __csv_del_inconsistent_rows(csvfile)
-        raise
+        print("Stopping...")
+
+        os.chdir(root_dir)
+        __add_keyval_json("next_urlSeq", seq, medialog_file);
+        shutil.rmtree(seqdir)
     except Exception as e:
+        os.chdir(root_dir)
+        __add_keyval_json("next_urlSeq", seq, medialog_file);
+        shutil.rmtree(seqdir)
         print(e)
-
-
-def __scrap_link(link, it, csvfile="links.csv"):
-    """ given a link, try to get items from this link """
-
-    try:
-        __createDir("Links/"+it)
-        directory = __link_directory(link, it)
-        __createDir(directory)
-
-        __youtube_link_download(link, it, csvfile)
-
-        for im in __urlImageGenerator(link):
-            __request_link_download(im, it, csvfile, directory)
-
-        print('\x1b[6;30;42m' + "Scrap Finished for Link " + str(it) +
-              '\x1b[0m')
-
-    except KeyboardInterrupt:
-        # if occurs a keyboard interruption, delete all media related to the
-        # given item
-        shutil.rmtree("Links/"+it, ignore_errors=True)
-        __csv_del_inconsistent_rows(csvfile)
         raise
-    except Exception as e:
-        print(e)
 
 
 # compares if media on imagepath and videopath is similar to media in linkspath
@@ -580,7 +553,11 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="",
     #TODO Add % completed
     try:
         if type_file == "i" or type_file == "image":
-            if from_beginning == False:
+            # if from beginning is false, execute a previous loop, which
+            # tries to skip to the last image downloaded (therefore it
+            # will not check if each image exists or not, and will enhance
+            # performance)
+            if from_beginning is False:
                 if "last_image" in medialog.keys():
                     last_image = str(medialog["last_image"])
                     last_image_fl = float(last_image.replace("_","."))
@@ -599,6 +576,7 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="",
                             csvGen = __csvGenerator(directory + "/" + csvfile)
                             break
 
+            # Image Loop
             for line in csvGen:
                 linkfile = directory + "/Images/" + line[0]
 
@@ -622,6 +600,7 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="",
                 __add_keyval_json("last_image", last_image, medialog_file)
 
         elif type_file == "v" or type_file == "video":
+            # Previous Loop (See explanation in the image case)
             if from_beginning == False:
                 if "last_video" in medialog.keys():
                     last_video = str(medialog["last_video"])
@@ -640,6 +619,7 @@ def media_csv_download(csvfile, type_file="", directory="", csvset="",
                             csvGen = __csvGenerator(directory + "/" + csvfile)
                             break
 
+            # Video Loop
             for line in csvGen:
                 # if sample mode is set, download only a small number of
                 # items, based on the sample probability
@@ -796,7 +776,7 @@ def __add_keyval_json(key, value, jsonfile):
     """ add a key-value to a json file """
 
     if os.path.isfile(jsonfile):
-        with open(jsonfile) as f:
+        with open(jsonfile, "r") as f:
             data = json.load(f)
     else:
         data = dict()
@@ -972,7 +952,7 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
     __createDir(directory)
     __createDir(directory + "/Images")
     __createDir(directory + "/Videos")
-    __createDir(directory + "/Links")
+    __createDir(directory + "/Media_URL")
 
 
     # header of the csv files
@@ -984,12 +964,16 @@ def extract_collection(title, ownerId, start_date=None, end_date=None):
 
     head_set_links = ["link", "item_id", "path"]
 
+    head_set_urls = ["seq", "url"]
+
     # writes the headers
     __write_line_b_csv(directory + "/items.csv", head, newfile=True)
     __write_line_b_csv(directory + "/image.csv", head_media, newfile=True)
     __write_line_b_csv(directory + "/video.csv", head_media, newfile=True)
     __write_line_b_csv(directory + "/link_list.csv", head_list, newfile=True)
     __write_line_b_csv(directory + "/set_links.csv", head_set_links,
+                       newfile=True)
+    __write_line_b_csv(directory + "/set_urls.csv", head_set_links,
                        newfile=True)
 
     # query - Item
