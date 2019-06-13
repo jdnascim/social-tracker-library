@@ -312,10 +312,8 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
                 for im in __urlImageGenerator(url):
                     try:
 
-                        # palliative measure in order to deal with strange urls
-                        output = im[__lastocc(im,"/")+1:]
-                        if output == "":
-                            output = str(random.randint(1,100000000))
+                        if "base64," in img:
+                            continue
 
                         __request_download(link=im, output=output)
                     except requests.exceptions.ConnectionError as e:
