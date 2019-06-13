@@ -314,7 +314,7 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
 
                         # palliative measure in order to deal with strange urls
                         output = im[__lastocc(im,"/")+1:]
-                        if output = "":
+                        if output == "":
                             output = str(random.randint(1,100000000))
 
                         __request_download(link=im, output=output)
