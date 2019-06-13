@@ -315,7 +315,7 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
                         if "base64," in im:
                             continue
 
-                        __request_download(link=im, output=output)
+                        __request_download(link=im, im[__lastocc(im,"/")+1:])
                     except requests.exceptions.ConnectionError as e:
                         print(e)
                         continue
