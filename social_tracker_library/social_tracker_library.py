@@ -312,7 +312,7 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
                 for im in __urlImageGenerator(url):
                     try:
 
-                        if "base64," in img:
+                        if "base64," in im:
                             continue
 
                         __request_download(link=im, output=output)
