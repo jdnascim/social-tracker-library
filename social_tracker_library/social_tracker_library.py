@@ -296,8 +296,8 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
 
             if url not in setUrls.keys():
 
-                print('\x1b[6;30;42m' + "Starting Scrapping for Link " + str(url) +
-                      '\x1b[0m')
+                print('\x1b[6;30;42m' + "Starting Scrapping for Link " +
+                      str(url) + "(" + srt(seq) + ")" + '\x1b[0m')
 
                 os.mkdir(seqdir)
                 os.chdir(seqdir)
@@ -311,7 +311,13 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
 
                 for im in __urlImageGenerator(url):
                     try:
-                        __request_download(link=im, output=im[__lastocc(im,"/")+1:])
+
+                        # palliative measure in order to deal with strange urls
+                        output = im[__lastocc(im,"/")+1:]
+                        if output = "":
+                            output = str(random.randint(1,100000000))
+
+                        __request_download(link=im, output=output)
                     except requests.exceptions.ConnectionError as e:
                         print(e)
                         continue
