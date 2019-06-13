@@ -297,7 +297,7 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
             if url not in setUrls.keys():
 
                 print('\x1b[6;30;42m' + "Starting Scrapping for Link " +
-                      str(url) + "(" + srt(seq) + ")" + '\x1b[0m')
+                      str(url) + "(" + str(seq) + ")" + '\x1b[0m')
 
                 os.mkdir(seqdir)
                 os.chdir(seqdir)
