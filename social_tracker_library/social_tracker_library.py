@@ -315,7 +315,17 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
                         if "base64," in im:
                             continue
 
-                        __request_download(link=im, output=im[__lastocc(im,"/")+1:])
+                        lo = __lastocc(im,"/")+1
+
+                        if lo < len(im)-1:
+                            output = im[__lastocc(im,"/")+1:]
+                        else:
+                            output = im[__lastocc(im[:-1],"/")+1:-1]
+
+                        if output == "":
+                            output = random.randint(1,10000)
+
+                        __request_download(link=im, output=output)
                     except requests.exceptions.ConnectionError as e:
                         print(e)
                         continue
