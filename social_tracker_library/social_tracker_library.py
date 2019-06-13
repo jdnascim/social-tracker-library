@@ -306,6 +306,9 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
                     except requests.exceptions.ConnectionError as e:
                         print(e)
                         continue
+                    except requests.exceptions.InvalidSchema as e:
+                        print(e)
+                        continue
 
                 os.chdir(directory)
 
