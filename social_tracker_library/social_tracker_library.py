@@ -253,10 +253,15 @@ def __collection_regstr_query(keywords):
 
 def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
               urldir="UrlMedia", medialog_file="medialog.json",
-              ignore_twitter_link=True):
-    #### TODO: IMPLEMENT A LOOP WHICH EXECUTES THE METHOD BELOW FOR EACH LINK
-    #### IN THE FILE PASSED AS PARAMETER.
+              directory="", ignore_twitter_link=True):
+
     root_dir = os.getcwd()
+
+    if directory != "":
+        os.chdir(directory)
+        directory = os.getcwd()
+    else:
+        directory = root_dir
 
     setUrls = __csv_to_dict(csvset, 1, 0)
 
@@ -274,7 +279,7 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
         seq = max([int(d) for d in os.listdir(urldir)] + [0]) + 1
 
     try:
-        seqdir = urldir + "/" + str(seq)
+        seqdir = os.path.realpath(urldir + "/" + str(seq))
 
         # iterate through each link
         for line in __csvGenerator(csvlinks):
@@ -290,18 +295,19 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
 
                 try:
                     youtube_dl.YoutubeDL({}).download([url])
-                except youtube_dl.DownloadError:
-                    os.chdir(root_dir)
-                    os.rmtree(seqdir)
-                    continue
+                except KeyboardInterrupt as e:
+                    raise
+                except Exception as e:
+                    print(e)
 
                 for im in __urlImageGenerator(url):
                     try:
                         __request_download(link=im, output=im[__lastocc(im,"/")+1:])
-                    except requests.exceptions.ConnectionError:
+                    except requests.exceptions.ConnectionError as e:
+                        print(e)
                         continue
 
-                os.chdir(root_dir)
+                os.chdir(directory)
 
                 setUrls[url] = seq
 
@@ -311,7 +317,9 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
                       '\x1b[0m')
 
                 seq += 1
-                seqdir = urldir + "/" + str(seq)
+                seqdir = os.path.realpath(urldir + "/" + str(seq))
+
+        os.chdir(root_dir)
 
     except KeyboardInterrupt:
         print("Stopping...")
