@@ -281,14 +281,23 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
     try:
         seqdir = os.path.realpath(urldir + "/" + str(seq))
 
+        # implemented in order to give a feedback about progresss %
+        total_row = sum(1 for row in __csvGenerator(csvlinks))
+        row_count = 0
+
         # iterate through each link
         for line in __csvGenerator(csvlinks):
+            row_count += 1
+
             if "https://twitter.com" in line[0] and ignore_twitter_link:
                 continue
 
             url = __expandURL(line[0])
 
             if url not in setUrls.keys():
+
+                print('\x1b[6;30;42m' + "Starting Scrapping for Link " + str(url) +
+                      '\x1b[0m')
 
                 os.mkdir(seqdir)
                 os.chdir(seqdir)
@@ -317,7 +326,7 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
                 __write_line_b_csv(csvfile=csvset, line=[seq, url])
 
                 print('\x1b[6;30;42m' + "Scrap Finished for Link " + str(url) +
-                      '\x1b[0m')
+                      " (" + str(row_count*100/total_row) + "%)" + '\x1b[0m')
 
                 seq += 1
                 seqdir = os.path.realpath(urldir + "/" + str(seq))
@@ -327,12 +336,16 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
     except KeyboardInterrupt:
         print("Stopping...")
 
-        os.chdir(root_dir)
         __add_keyval_json("next_urlSeq", seq, medialog_file);
+
+        os.chdir(root_dir)
+
         shutil.rmtree(seqdir)
     except Exception as e:
-        os.chdir(root_dir)
         __add_keyval_json("next_urlSeq", seq, medialog_file);
+
+        os.chdir(root_dir)
+
         shutil.rmtree(seqdir)
         print(e)
         raise
