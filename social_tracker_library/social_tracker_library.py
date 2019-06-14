@@ -311,7 +311,7 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
                 try:
                     # in order to avoid stalls in lives
                     signal.signal(signal.SIGALRM, __handler_timeout)
-                    signal.alarm(500)
+                    signal.alarm(1000)
 
                     youtube_dl.YoutubeDL({}).download([url])
                 except KeyboardInterrupt as e:
@@ -334,8 +334,8 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
                         else:
                             output = im[__lastocc(im[:-1],"/")+1:-1]
 
-                        if output == "":
-                            output = random.randint(1,10000)
+                        if output == "" or len(output) > 80:
+                            output = random.randint(1,10000000000000)
 
                         __request_download(link=im, output=output)
                     except requests.exceptions.ConnectionError as e:
