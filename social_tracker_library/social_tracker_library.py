@@ -337,7 +337,7 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
                         if output == "" or len(output) > 80:
                             output = random.randint(1,10000000000000)
 
-                        __request_download(link=im, output=output)
+                        __request_download(link=im, output=str(output))
                     except requests.exceptions.ConnectionError as e:
                         print(e)
                         continue
@@ -352,7 +352,7 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
                 __write_line_b_csv(csvfile=csvset, line=[seq, url])
 
                 print('\x1b[6;30;42m' + "Scrap Finished for Link " + str(url) +
-                      " (" + str(round(row_count*100/total_row)) + "%)" + '\x1b[0m')
+                      " (" + str(round(row_count*100/total_row, 4)) + "%)" + '\x1b[0m')
 
                 seq += 1
                 seqdir = os.path.realpath(urldir + "/" + str(seq))
