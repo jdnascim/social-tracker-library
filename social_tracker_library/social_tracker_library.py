@@ -20,6 +20,7 @@ import string
 import operator
 import itertools
 import twokenize
+import signal
 from newspaper import Article
 from bs4 import BeautifulSoup
 from dateutil import parser
@@ -251,6 +252,11 @@ def __collection_regstr_query(keywords):
     return re.compile(regstr, re.IGNORECASE)
 
 
+def __handler_timeout(signum, frame):
+    print("timeout")
+    raise Exception()
+
+
 def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
               urldir="UrlMedia", medialog_file="medialog.json",
               directory="", ignore_twitter_link=True):
@@ -303,11 +309,17 @@ def url_media(csvlinks="link_list.csv", csvset="set_urls.csv",
                 os.chdir(seqdir)
 
                 try:
+                    # in order to avoid stalls in lives
+                    signal.signal(signal.SIGALRM, __handler_timeout)
+                    signal.alarm(1000)
+
                     youtube_dl.YoutubeDL({}).download([url])
                 except KeyboardInterrupt as e:
                     raise
                 except Exception as e:
                     print(e)
+                finally:
+                    signal.alarm(0)
 
                 for im in __urlImageGenerator(url):
                     try:
