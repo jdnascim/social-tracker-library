@@ -1,34 +1,37 @@
 import datetime
 import csv
 import os
-import youtube_dl
+import parser
+import unicodedata
+import glob
+import json
+
 
 class Date:
     @classmethod
     def date2tmiles(cls, dat):
-        """ return timemiles from a date at the same format used in the system """
+        """ return timemiles from a date at the same format used in the system
+        """
 
-        #TODO: require YYYY-MM-DD format
+        # TODO: require YYYY-MM-DD format
 
         return int(parser.parse(str(dat)).strftime("%s")) * 1000
-
 
     @classmethod
     def tmiles2date(cls, tmiles):
         """ return date from timemiles """
         return datetime.datetime.fromtimestamp(int(tmiles)/1.e3)
 
-
     @classmethod
     def now(cls, days=0):
         """ return now in miles """
 
         if days >= 0:
-            return int(datetime.datetime.now().strftime("%s") + datetime.timedelta(
-                days=days)) * 1000
+            return int(datetime.datetime.now().strftime("%s")
+                       + datetime.timedelta(days=days)) * 1000
         else:
-            return int(datetime.datetime.now().strftime("%s") + datetime.timedelta(
-                days=(-1)*days)) * 1000
+            return int(datetime.datetime.now().strftime("%s")
+                       + datetime.timedelta(days=(-1)*days)) * 1000
 
 
 class Text:
@@ -36,8 +39,9 @@ class Text:
     def strip_accents(cls, s):
         """ given a string, returns it without any stress """
 
-        return ''.join(c for c in unicodedata.normalize('NFD', s)
-            if unicodedata.category(c) != 'Mn').lower()
+        return ''.join([
+            c for c in unicodedata.normalize('NFD', s) if unicodedata.category(
+                c) != 'Mn']).lower()
 
     @classmethod
     def lastocc(cls, somestr, char):
@@ -55,7 +59,7 @@ class Text:
             is the reason why a nowadays quite simple function
             like this one was developed """
 
-        #if "…http" in text.replace(" ", ""):
+        # if "…http" in text.replace(" ", ""):
 
         if "…" in text:
             return True
@@ -74,12 +78,10 @@ class OSUtils:
         except Exception:
             raise
 
-
     @classmethod
     def list_to_file(cls, filename, listname):
         with open(filename, 'w') as filehandle:
             filehandle.writelines("%s\n" % i for i in listname)
-
 
     @classmethod
     def file_to_list(cls, filename):
@@ -94,7 +96,7 @@ class OSUtils:
                 # remove linebreak which is the last character of the string
                 tmp.append(line[:-1])
 
-        return txt
+        return tmp
 
     # This method is necessary, because youtube-dl adds extension
     # to the filename after downloading it. Plus, it may works
@@ -113,7 +115,6 @@ class OSUtils:
             if time > most_recent_time:
                 most_recent_file = i
         return most_recent_file
-
 
     @classmethod
     def handler_timeout(cls, signum, frame):
@@ -135,7 +136,6 @@ class CSVUtils:
             wr = csv.writer(resultfile, dialect='excel')
             wr.writerow(line)
 
-
     @classmethod
     def csvGenerator(cls, csvfile, delimiter=",", hide_header=True):
         """ csv generator """
@@ -148,24 +148,22 @@ class CSVUtils:
         for line in csv.reader(f, delimiter=delimiter):
             yield line
 
-
     @classmethod
-    def csv_to_dict(csvfile, id_key, id_value, delimiter=','):
+    def csv_to_dict(cls, csvfile, id_key, id_value, delimiter=','):
         """ given a csv file, return a dict based upon it """
 
-        csvgen = __csvGenerator(csvfile, delimiter=delimiter)
+        csvgen = cls.__csvGenerator(csvfile, delimiter=delimiter)
 
         csvdict = dict()
 
         for row in csvgen:
             csvdict[row[id_key]] = row[id_value]
 
-        #TODO if every key is digit, turn into int
-        #TODO id_value should be a list of index
-        #TODO increment delimiter parameter (delimiter=',')
+        # TODO if every key is digit, turn into int
+        # TODO id_value should be a list of index
+        # TODO increment delimiter parameter (delimiter=',')
 
         return csvdict
-
 
 
 class JSONUtils:
@@ -183,7 +181,6 @@ class JSONUtils:
 
         with open(jsonfile, 'w') as f:
             json.dump(data, f, indent=2)
-
 
     @classmethod
     def read_keyval_json(cls, key, jsonfile):

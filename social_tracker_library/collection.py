@@ -1,6 +1,5 @@
 import json
 import redis
-import datetime
 import math
 import random
 import os
@@ -8,37 +7,38 @@ import time
 import re
 from pymongo import MongoClient
 
-from .constants import CONF_FILE, IMAGEDIR, VIDEODIR, URLDIR, HEAD_ITEMS
-from .constants import HEAD_MEDIA, HEAD_SET_URLS, HEAD_SET_LINKS, HEAD_LINK_LIST
+from .constants import IMAGEDIR, VIDEODIR, URLDIR, HEAD_ITEMS, HEAD_LINK_LIST
+from .constants import HEAD_MEDIA, HEAD_SET_LINKS
 from .constants import CSVIMAGE, CSVITEMS, CSVLINKS, CSVVIDEO, CSVSETURL
 from .constants import CSVSETLINKS
+from .conf import MONGO, REDIS
 from .utils import Date, Text, OSUtils, CSVUtils
 
+
 class collection:
-    def __init__(self, title, ownerId, start_date=None, end_date=None, original=True):
+    def __init__(self, title, ownerId, start_date=None, end_date=None,
+                 original=True):
         self.title = title
         self.ownerId = ownerId
         self.start_date = start_date
         self.end_date = end_date
-        self.original = orginal
+        self.original = original
 
-
-    def __demoConnection(self):
+    @classmethod
+    def __demoConnection(cls):
         """ returns database connection """
 
-        with open(CONF_FILE, 'r') as fp:
-            conf = json.load(fp)
+        conf = MONGO
 
         client = MongoClient(
-            conf["mongo"]["path"],
-            username=conf["mongo"]["username"],
-            password=conf["mongo"]["password"],
-            authSource=conf["mongo"]["authsource"],
+            conf["path"],
+            username=conf["username"],
+            password=conf["password"],
+            authSource=conf["authsource"],
             unicode_decode_error_handler='ignore')
 
         # returning database
         return client.Demo
-
 
     @classmethod
     def __mediaItem(cls, m_id):
@@ -48,21 +48,21 @@ class collection:
 
         return db_m.MediaItem.find({"_id": m_id})[0]
 
-
-    def __publish_redis(self, channel, message):
+    @classmethod
+    def __publish_redis(cls, channel, message):
         """ publish changes in redis (in order to inform listeners) """
 
-        with open(CONF_FILE, 'r') as fp:
-            conf = json.load(fp)
+        conf = REDIS
 
-        r = redis.StrictRedis(host=conf["redis"]["host"],
-                              port=conf["redis"]["port"], db=conf["redis"]["db"])
+        r = redis.StrictRedis(host=conf["host"], port=conf["port"],
+                              db=conf["db"])
 
         r.publish(channel, message)
 
-
     def keywords_list(self):
         """ list the keywords of a given collection """
+        self.exists(exception_if_not=True)
+
         db_m = self.__demoConnection()
 
         keys = db_m.Collection.find_one({'title': self.title,
@@ -72,17 +72,17 @@ class collection:
 
         return keys_l
 
-
     def add_keywords(self, new_keywords):
         """ add new keywords in a given collection """
+        self.exists(exception_if_not=True)
 
         if isinstance(new_keywords, str):
             raise Exception("Error - please pass the keywords as a list")
 
         db_m = self.__demoConnection()
 
-        keys = db_m.Collection.find_one({'title': self.title,
-                                         'ownerId': self.ownerId})["keywords"]
+        keys = db_m.Collection.find_one(
+            {'title': self.title, 'ownerId': self.ownerId})["keywords"]
 
         # create a set in order to not include a duplicate keyword
         set_current_keys = set()
@@ -97,21 +97,34 @@ class collection:
         for new_key in set_new_keys:
             keys.append({'keyword': new_key})
 
+        db_m.Collection.update_one(
+            {'title': self.title, 'ownerId': self.ownerId},
+            {'$set': {'keywords': keys}})
+
+        edited_collection = db_m.Collection.find_one(
+            {'title': self.title, 'ownerId': self.ownerId})
+
         self.__publish_redis("collections:edit", json.dumps(edited_collection))
 
-
-    def exists(self):
+    def exists(self, exception_if_exists=False, exception_if_not=False):
         """ verify if a collection exists """
         db_m = self.__demoConnection()
 
-        col = db_m.Collection.find_one({'title': self.title,
-                                         'ownerId': self.ownerId})
+        col = db_m.Collection.find_one(
+            {'title': self.title, 'ownerId': self.ownerId})
+
+        if bool(col) is True and exception_if_exists is True:
+            raise Exception("ERROR: Collection Exists")
+
+        elif bool(col) is False and exception_if_not is True:
+            raise Exception("ERROR: Collection Does Not Exists")
 
         return bool(col)
 
-
     def remove_keywords(self, keywords):
         """ remove keywords in a given collection """
+
+        self.exists(exception_if_not=True)
 
         if isinstance(keywords, str):
             raise Exception("Error - please pass the keywords as a list")
@@ -134,15 +147,16 @@ class collection:
             if k["keyword"].lower() not in keywords:
                 new_keys.append({'keyword': k["keyword"].lower()})
 
-        db_m.Collection.update_one({'title': self.title, 'ownerId': self.ownerId},
-                                   {'$set': {'keywords': new_keys}})
+        db_m.Collection.update_one(
+            {'title': self.title, 'ownerId': self.ownerId},
+            {'$set': {'keywords': new_keys}})
 
         edited_collection = db_m.Collection.find_one({'title': self.title,
                                                       'ownerId': self.ownerId})
 
         self.__publish_redis("collections:edit", json.dumps(edited_collection))
 
-''
+    @classmethod
     def list_collections(cls):
         """ lists current collections in the system """
 
@@ -162,32 +176,35 @@ class collection:
             print("locations:", str(col["nearLocations"]))
             print("")
 
-
-    def item_count(self):
+    def item_count(self, start_date=None, end_date=None, original=True):
         """ count the qtde of items given a collection """
+
+        self.exists(exception_if_not=True)
 
         # connection with Mongo
         db_m = self.__demoConnection()
 
-        item_query = self.__item_query(start_date, end_date)
+        item_query = self.__item_query(start_date, end_date, original)
 
         return db_m.Item.find(item_query).count()
-
 
     def create(self, keywords):
         """ create a collection """
 
         # future implementation
-        # users = []  Users (e.g. prefeituraunicamp facebook, jornaloglobo twitter)
+        # users = []  Users (prefeituraunicamp facebook, jornaloglobo twitter)
         # location = []  Location
 
+        self.exists(exception_if_exists=True)
+
         if self.exists():
-            raise Exception("Error - Collection with same title and owner already exists")
+            raise Exception("Error - Collection with same title and owner\
+                            already exists")
 
         creationDate = Date.now()
 
-        _id = str(math.floor(random.random() * 90000) + 10000) + self.ownerId + str(
-            creationDate)
+        _id = str(math.floor(random.random() * 90000) + 10000)
+        + self.ownerId + str(creationDate)
 
         since = Date.now(-15)
 
@@ -220,8 +237,8 @@ class collection:
 
         self.__publish_redis("collections:new", json.dumps(new_collection))
 
-
-    def __collection_regstr_query(keywords):
+    @classmethod
+    def __collection_regstr_query(cls, keywords):
         """ receives a set of keywords and returns the related regex query """
 
         if len(keywords) == 0:
@@ -237,23 +254,22 @@ class collection:
 
         return re.compile(regstr, re.IGNORECASE)
 
-
-    def __item_query(self):
-        """ given the name of a collection, its owner and start/end date, returns
-            the query to pass as parameter of db.Collection.Find() """
+    def __item_query(self, start_date=None, end_date=None, original=True):
+        """ given the name of a collection, its owner and start/end date,
+            returns the query to pass as parameter of db.Collection.Find() """
 
         db_m = self.__demoConnection()
 
         # get the register concerning the collection passed as parameter
         collection_settings = db_m.Collection.find({
-                                                "ownerId": ownerId,
-                                                "title": title
+                                                "ownerId": self.ownerId,
+                                                "title": self.title
                                                  })[0]
 
         # generate the query
         items_query = dict()
 
-        items_query["title"] = __collection_regstr_query(
+        items_query["title"] = self.__collection_regstr_query(
             collection_settings["keywords"])
 
         # if original is true, query should return only orginal. If orginal is
@@ -262,18 +278,21 @@ class collection:
             items_query["original"] = original
 
         if start_date is not None:
-            items_query["publicationTime"] = {"$gte": utils.date2tmiles(start_date)}
+            items_query["publicationTime"] = {
+                "$gte": Date.date2tmiles(start_date)}
         else:
-            items_query["publicationTime"] = {"$gte": collection_settings["since"]}
+            items_query["publicationTime"] = {
+                "$gte": collection_settings["since"]}
 
         if end_date is not None:
-            items_query["publicationTime"] = {"$lte": utils.date2tmiles(end_date)}
+            items_query["publicationTime"] = {
+                "$lte": Date.date2tmiles(end_date)}
 
         return items_query
 
-
     def ContentGenerator(self):
         """ generator of the content of a given collection """
+        self.exists(exception_if_not=True)
 
         # connection with Mongo
         db_m = self.__demoConnection()
@@ -285,9 +304,11 @@ class collection:
         for it in items:
             yield it
 
-
-    def tags_facet_query(self, variant_analysis=True):
+    def tags_facet_query(self, start_date=None, end_date=None, original=None,
+                         variant_analysis=True):
         """ facet query in 'tags' field of Item collection. """
+
+        self.exists(exception_if_not=True)
 
         db_m = self.__demoConnection()
 
@@ -304,75 +325,84 @@ class collection:
             {'$project': {"_id": 0, "tags_facet": 1}}
         ])
 
-        list_facet_tags = []
+        facet_tags = []
 
         # It will always iterate only once
         for tags_facet in facet_query:
-            list_facet_tags = tags_facet["tags_facet"]
+            facet_tags = tags_facet["tags_facet"]
 
         # Pre-processing phase
 
         # 1 - Remove lower/upper case redundancy
         lowerReduDict = dict()
         lowerReduSet = set()
-        for i in range(len(list_facet_tags)):
-            if list_facet_tags[i]["tags"] == list_facet_tags[i]["tags"].lower():
-                lowerReduDict[list_facet_tags[i]["tags"]] = i
+        for i in range(len(facet_tags)):
+            if facet_tags[i]["tags"] == facet_tags[i]["tags"].lower():
+                lowerReduDict[facet_tags[i]["tags"]] = i
 
-        for i in range(len(list_facet_tags)):
-            tlw = list_facet_tags[i]["tags"].lower()
+        for i in range(len(facet_tags)):
+            tlw = facet_tags[i]["tags"].lower()
 
-            if list_facet_tags[i]["tags"] != tlw and tlw in lowerReduDict.keys():
-                list_facet_tags[lowerReduDict[tlw]]["count"] += list_facet_tags[i]["count"]
+            if facet_tags[i]["tags"] != tlw and tlw in lowerReduDict.keys():
+                facet_tags[lowerReduDict[tlw]]["count"] += facet_tags[i][
+                    "count"]
                 lowerReduSet.add(i)
-            elif list_facet_tags[i]["tags"] != tlw:
-                list_facet_tags[i]["tags"] = tlw
+            elif facet_tags[i]["tags"] != tlw:
+                facet_tags[i]["tags"] = tlw
                 lowerReduDict[tlw] = i
 
-        list_facet_tags = [list_facet_tags[i] for i in range(len(list_facet_tags)) if i not in lowerReduSet]
+        facet_tags = [facet_tags[i] for i in range(len(facet_tags)) if i not in
+                      lowerReduSet]
 
         # 2 - Add stressed words as "variant"
         if variant_analysis is True:
             stressRemDict = dict()
             stressRemSet = set()
-            for i in range(len(list_facet_tags)):
-                if list_facet_tags[i]["tags"] == Text.strip_accents(list_facet_tags[i]["tags"]):
-                    stressRemDict[list_facet_tags[i]["tags"]] = i
-                list_facet_tags[i]["variant_keys"] = []
+            for i in range(len(facet_tags)):
+                if facet_tags[i]["tags"
+                                 ] == Text.strip_accents(facet_tags[i]["tags"
+                                                                       ]):
+                    stressRemDict[facet_tags[i]["tags"]] = i
+                facet_tags[i]["variant_keys"] = []
 
-            for i in range(len(list_facet_tags)):
-                tsr = Text.__strip_accents(list_facet_tags[i]["tags"])
+            for i in range(len(facet_tags)):
+                tsr = Text.__strip_accents(facet_tags[i]["tags"])
 
-                if list_facet_tags[i]["tags"] != tsr and tsr in stressRemDict.keys():
-                    list_facet_tags[stressRemDict[tsr]]["count"] += list_facet_tags[i]["count"]
-                    list_facet_tags[stressRemDict[tsr]]["variant_keys"].append(list_facet_tags[i]["tags"])
+                if facet_tags[i]["tags"
+                                 ] != tsr and tsr in stressRemDict.keys():
+                    facet_tags[stressRemDict[tsr]]["count"] += facet_tags[i][
+                        "count"]
+                    facet_tags[stressRemDict[tsr]]["variant_keys"].append(
+                        facet_tags[i]["tags"])
                     stressRemSet.add(i)
-                elif list_facet_tags[i]["tags"] != tsr:
-                    list_facet_tags[i]["variant_keys"].append(list_facet_tags[i]["tags"])
-                    list_facet_tags[i]["tags"] = tsr
+                elif facet_tags[i]["tags"] != tsr:
+                    facet_tags[i]["variant_keys"].append(facet_tags[i]["tags"])
+                    facet_tags[i]["tags"] = tsr
                     stressRemDict[tsr] = i
 
-            list_facet_tags = [list_facet_tags[i] for i in range(len(list_facet_tags)) if i not in stressRemSet]
+            facet_tags = [facet_tags[i] for i in range(len(facet_tags)) if i
+                          not in stressRemSet]
 
-        list_facet_tags.sort(reverse=True, key=lambda x: x['count'])
+        facet_tags.sort(reverse=True, key=lambda x: x['count'])
 
-        return list_facet_tags
+        return facet_tags
 
-
-    def extract_collection(self, directory=None):
-        """ extracts items from a given collection, and organizes it in files """
+    def __create_files(self, directory=None):
+        """ create collection's dir and files """
 
         # creates dir where things are going to be stored
         if directory is None:
             if not os.path.isdir(str(self.title)):
                 directory = str(self.title)
-            elif not os.path.isdir(str(self.title) + "_" + str(ownerId)):
-                directory = str(self.title) + "_" + str(ownerId)
+            elif not os.path.isdir(str(self.title) + "_" + str(self.ownerId)):
+                directory = str(self.title) + "_" + str(self.ownerId)
             else:
-                directory = str(self.title) + "_" + str(ownerId) + str(Date.now())
+                directory = str(self.title) + "_" + str(self.ownerId)
+                + str(Date.now())
                 while(os.path.isdir(directory)):
                     time.sleep(1)
-                    directory = str(self.title) + "_" + str(ownerId) + str(Date.now())
+                    directory = str(self.title) + "_" + str(self.ownerId)
+                    + str(Date.now())
 
             directory = directory.replace(" ", "")
 
@@ -386,23 +416,34 @@ class collection:
         head_media = HEAD_MEDIA
         head_list = HEAD_LINK_LIST
         head_set_links = HEAD_SET_LINKS
-        head_set_urls = HEAD_SET_URLS
 
         # writes the headers
-        CSVUtils.write_line_b_csv(directory + "/" + CSVITEMS, head, newfile=True)
-        CSVUtils.write_line_b_csv(directory + "/" + CSVIMAGE, head_media, newfile=True)
-        CSVUtils.write_line_b_csv(directory + "/" + CSVVIDEO, head_media, newfile=True)
-        CSVUtils.write_line_b_csv(directory + "/" + CSVLINKS, head_list, newfile=True)
-        CSVUtils.write_line_b_csv(directory + "/" + CSVSETLINKS, head_set_links,
-                           newfile=True)
+        CSVUtils.write_line_b_csv(directory + "/" + CSVITEMS, head,
+                                  newfile=True)
+        CSVUtils.write_line_b_csv(directory + "/" + CSVIMAGE, head_media,
+                                  newfile=True)
+        CSVUtils.write_line_b_csv(directory + "/" + CSVVIDEO, head_media,
+                                  newfile=True)
+        CSVUtils.write_line_b_csv(directory + "/" + CSVLINKS, head_list,
+                                  newfile=True)
+        CSVUtils.write_line_b_csv(directory + "/" + CSVSETLINKS,
+                                  head_set_links, newfile=True)
         CSVUtils.write_line_b_csv(directory + "/" + CSVSETURL, head_set_links,
-                           newfile=True)
+                                  newfile=True)
+
+    def extract_collection(self, directory=None):
+        """ extracts items from a given collection, and organizes it in files
+        """
+
+        self.exists(exception_if_not=True)
+
+        self.__create_files(directory)
 
         # query - Item
         print("Fetching...")
 
-        # for each item collected, verify if it matches the keywords and save in an
-        # csv file the main attributes
+        # for each item collected, verify if it matches the keywords and save
+        # in an csv file the main attributes
         items_count = 0
 
         items = self.ContentGenerator()
@@ -421,7 +462,8 @@ class collection:
                 if field in it:
                     # convert data into human-readable format
                     if field == "publicationTime":
-                        line.append(str(Date.tmiles2date(it["publicationTime"])))
+                        line.append(
+                            str(Date.tmiles2date(it["publicationTime"])))
 
                     # extra procedures if there is media related to the item
                     elif field == "mediaIds":
@@ -435,14 +477,16 @@ class collection:
                             name_media = line[0] + "_" + str(m_ct)
 
                             if mit["type"] == "image":
-                                CSVUtils.write_line_b_csv(directory + "/" + CSVIMAGE,
-                                                   [name_media] + line[:-1] +
-                                                   [mit["source"]] + [mit["url"]])
+                                CSVUtils.write_line_b_csv(
+                                    directory + "/" + CSVIMAGE,
+                                    [name_media] + line[:-1] + [mit["source"]]
+                                    + [mit["url"]])
 
                             elif mit["type"] == "video":
-                                CSVUtils.write_line_b_csv(directory + "/" + CSVVIDEO,
-                                                   [name_media] + line[:-1] +
-                                                   [mit["source"]] + [mit["url"]])
+                                CSVUtils.write_line_b_csv(
+                                    directory + "/" + CSVVIDEO,
+                                    [name_media] + line[:-1]
+                                    + [mit["source"]] + [mit["url"]])
 
                             m_ct += 1
 
@@ -450,12 +494,11 @@ class collection:
                         line.append(str(len(it["links"])))
 
                         if len(it["links"]) > 0:
-                            basedir = "Links/" + line[0]
 
                             for lit in it["links"]:
-                                CSVUtils.write_line_b_csv(directory + "/" + CSVLINKS,
-                                                   [lit] +
-                                                   [str(line[0])])
+                                CSVUtils.write_line_b_csv(
+                                    directory + "/" + CSVLINKS,
+                                    [lit] + [str(line[0])])
 
                     else:
                         line.append(str(it[field]))

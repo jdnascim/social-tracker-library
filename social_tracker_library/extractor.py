@@ -4,14 +4,20 @@ import csv
 import shutil
 import requests
 import youtube_dl
+import html
+import random
+import signal
+from newspaper import Article
 
 from .constants import CSVITEMS, CSVIMAGE, CSVVIDEO, IMAGEDIR, VIDEODIR
-from .constants import CONF_FILE, URLDIR, CSVLINKS, CSVSETURL, CSVSETLINKS
+from .constants import URLDIR, CSVLINKS, CSVSETLINKS, CSVSETURL, MEDIALOG
+from .conf import COLLECTIONS
 from .utils import CSVUtils, OSUtils, JSONUtils, Text
+
 
 class extractor:
     def __init__(self, directory="./"):
-        this.directory = directory
+        self.directory = directory
 
     @classmethod
     def __expandURL(self, link):
@@ -21,19 +27,23 @@ class extractor:
         except Exception:
             return link
 
-
     @classmethod
     def __full_tweet_text(cls, link_t):
-        """ given a link to a tweet, extract its entire text. It is necessary for
-        twitter items which has more than 140 characters """
+        """ given a link to a tweet, extract its entire text. It is necessary
+        for twitter items which has more than 140 characters """
 
         try:
             page = requests.get(link_t)
             tree = html.fromstring(page.content)
-            text = tree.xpath('//div[contains(@class, "permalink-tweet-container")]//p[contains(@class, "tweet-text")]//text()')
+            text = tree.xpath('//div[contains(@class, \
+                              "permalink-tweet-container")]//p[contains(@class,\
+                               "tweet-text")]//text()')
 
             for i in range(len(text)):
-                if text[i][:4] == "pic." or text[i][:7] == "http://" or text[i][:4] == "www." or text[i][:8] == "https://":
+                if (text[i][:4] == "pic.") or (
+                    text[i][:7] == "http://") or (
+                        text[i][:4] == "www.") or (text[i][:8] == "https://"):
+
                     text[i] = " " + text[i]
                 if text[i] == "\xa0" or text[i] == "…":
                     text[i] = ""
@@ -45,7 +55,8 @@ class extractor:
 
     @classmethod
     def __urlImageGenerator(cls, link):
-        """ given a link, try to get images from it by the parameter og:image """
+        """ given a link, try to get images from it by the Article Library
+        """
 
         try:
             a = Article(url=link)
@@ -55,9 +66,8 @@ class extractor:
 
             for img in a.imgs:
                 yield img
-        except:
+        except Exception:
             pass
-
 
     def __request_download(self, link, output, overwrite=False):
         """request download"""
@@ -81,8 +91,8 @@ class extractor:
         except Exception:
             raise
 
-
-    def __youtube_download(self, link, output=None, noplaylist=True, overwrite=False):
+    def __youtube_download(self, link, output=None, noplaylist=True,
+                           overwrite=False):
         """ youtube download """
 
         try:
@@ -91,7 +101,6 @@ class extractor:
                                       'noplaylist': True}).download([link])
 
                 shutil.move(OSUtils.fileplusextension(output), output)
-
 
                 if bool(filetype.guess_mime(output)) is True:
                     print(link, output)
@@ -108,13 +117,14 @@ class extractor:
         except Exception:
             pass
 
-    def media_csv_download(self, type_file, csvfile="", csvset="", medialog_file="",
-                           from_beginning=False, sample=False, overwrite=False):
+    def media_csv_download(self, type_file, csvfile="", csvset="",
+                           medialog_file="", from_beginning=False,
+                           sample=False, overwrite=False):
         """ download media from the csv generated
             type parameter: (I)mage or (V)ideo
             from_beginning: defines if it will start based on the medialog_file
-            sample: if it is a number, download (randomly and approximately) only
-                    total*sample items """
+            sample: if it is a number, download (randomly and approximately)
+            only total*sample items """
 
         # verify if sample is valid
         sample_mode = False
@@ -139,21 +149,21 @@ class extractor:
         # if csvfile was passed as parameter, assumes the directory as
         # the same of the csvfile
         if csvfile != "":
-            directory = csvfile[:Text.lastocc(csvfile,"/")]
-            csvfile = csvfile[Text.lastocc(csvfile,"/")+1:]
+            directory = csvfile[:Text.lastocc(csvfile, "/")]
+            csvfile = csvfile[Text.lastocc(csvfile, "/")+1:]
         else:
             if type_file == "i" or type_file == "image":
                 csvfile = CSVIMAGE
             else:
                 csvfile = CSVVIDEO
 
-            if this.directory[-1] == "/":
-                directory = this.directory[:-1]
+            if self.directory[-1] == "/":
+                directory = self.directory[:-1]
             else:
-                directory = this.directory
+                directory = self.directory
 
         if csvset == "":
-            csvset = directory + "/" + CSVSET
+            csvset = directory + "/" + CSVSETLINKS
 
         # now it iterates through the csvfile [csvGenerator()] and download the
         # items [*.download() -> depends on the type specified]
@@ -162,17 +172,10 @@ class extractor:
 
         # if from_beginning = False, try to start from the file where it
         # stopped in the former iteration
-        if medialog_file == "":
-            medialog_file = directory + "/" + MEDIALOG
+        last_image = str(JSONUtils.read_keyval_json("last_image", MEDIALOG))
+        last_video = str(JSONUtils.read_keyval_json("last_video", MEDIALOG))
 
-        if os.path.isfile(medialog_file) is False:
-            with open(medialog_file, 'w') as medialog:
-                json.dump(dict(), medialog)
-
-        with open(medialog_file, 'r') as logfile:
-            medialog = json.load(logfile)
-
-        #TODO Add % completed
+        # TODO Add % completed
         try:
             if type_file == "i" or type_file == "image":
                 # if from beginning is false, execute a previous loop, which
@@ -180,22 +183,26 @@ class extractor:
                 # will not check if each image exists or not, and will enhance
                 # performance)
                 if from_beginning is False:
-                    if "last_image" in medialog.keys():
-                        last_image = str(medialog["last_image"])
-                        last_image_fl = float(last_image.replace("_","."))
+                    if "last_image" != "":
+                        last_image_fl = float(last_image.replace("_", "."))
                     else:
                         last_image = "0_0"
                         last_image_fl = 0.0
 
                     if last_image_fl > 0.0:
                         for line in csvGen:
-                            if float(str(line[0]).replace("_",".")) == last_image_fl:
+                            if float(str(line[0]).replace("_", "."
+                                                          )) == last_image_fl:
                                 print("Skipping until", line[0])
                                 break
-                            elif float(str(line[0]).replace("_",".")) > last_image_fl:
-                                print(float(str(line[0]).replace("_",".")), last_image_fl)
-                                print("Error: Last image in log does not exist - Starting from the beginning")
-                                csvGen = CSVUtils.csvGenerator(directory + "/" + csvfile)
+                            elif float(str(line[0]).replace("_", "."
+                                                            )) > last_image_fl:
+                                print(float(str(line[0]).replace(
+                                    "_", ".")), last_image_fl)
+                                print("Error: Last image in log does not \
+                                      exist - Starting from the beginning")
+                                csvGen = CSVUtils.csvGenerator(directory + "/"
+                                                               + csvfile)
                                 break
 
                 # Image Loop
@@ -203,42 +210,50 @@ class extractor:
                     linkfile = directory + "/" + IMAGEDIR + line[0]
 
                     try:
-                        # if sample mode is set, download only a small number of
-                        # items, based on the sample probability
+                        # if sample mode is set, download only a small number
+                        # of items, based on the sample probability
                         if sample_mode is True:
                             if random.random() < sample is False:
                                 continue
 
-                        chk = self.__request_download(line[7], linkfile, overwrite=overwrite)
+                        chk = self.__request_download(line[7], linkfile,
+                                                      overwrite=overwrite)
 
                         if chk is True:
-                            CSVUtils.write_line_b_csv(csvset, [self.__expandURL(line[7]), line[0], linkfile])
+                            CSVUtils.write_line_b_csv(csvset,
+                                                      [self.__expandURL(
+                                                          line[7]),
+                                                       line[0], linkfile])
                             last_image = line[0]
                     except requests.exceptions.ConnectionError:
                         continue
 
                 # set the last image downloaded after the end of the loop
                 if sample_mode is False:
-                    JSONUtils.add_keyval_json("last_image", last_image, medialog_file)
+                    JSONUtils.add_keyval_json("last_image", last_image,
+                                              medialog_file)
 
             elif type_file == "v" or type_file == "video":
                 # Previous Loop (See explanation in the image case)
-                if from_beginning == False:
-                    if "last_video" in medialog.keys():
-                        last_video = str(medialog["last_video"])
-                        last_video_fl = float(last_video.replace("_","."))
+                if from_beginning is False:
+                    if "last_video" != "":
+                        last_video_fl = float(last_video.replace("_", "."))
                     else:
                         last_video = "0_0"
                         last_video_fl = 0.0
 
                     if last_video_fl > 0.0:
                         for line in csvGen:
-                            if float(str(line[0]).replace("_",".")) == last_video_fl:
+                            if float(str(line[0]
+                                         ).replace("_", ".")) == last_video_fl:
                                 print("Skipping", line[0])
                                 break
-                            elif float(str(line[0]).replace("_",".")) > last_video_fl:
-                                print("Error: Last video in log does not exist - Starting from the beginning")
-                                csvGen = CSVUtils.csvGenerator(directory + "/" + csvfile)
+                            elif float(str(line[0]).replace("_", "."
+                                                            )) > last_video_fl:
+                                print("Error: Last video in log does not exist\
+                                       - Starting from the beginning")
+                                csvGen = CSVUtils.csvGenerator(directory + "/"
+                                                               + csvfile)
                                 break
 
                 # Video Loop
@@ -251,25 +266,31 @@ class extractor:
 
                     linkfile = directory + "/" + VIDEODIR + line[0]
 
-                    chk = self.__youtube_download(line[7], linkfile, overwrite=overwrite)
+                    chk = self.__youtube_download(line[7], linkfile,
+                                                  overwrite=overwrite)
 
                     if chk is True:
-                        CSVUtils.write_line_b_csv(csvset, [self.__expandURL(line[7]), line[1], linkfile])
+                        CSVUtils.write_line_b_csv(csvset,
+                                                  [self.__expandURL(line[7]),
+                                                   line[1], linkfile])
 
                         last_video = line[0]
 
                 # set the last video downloaded after the end of the loop
                 if sample_mode is False:
-                    JSONUtils.add_keyval_json("last_video", last_video, medialog_file)
+                    JSONUtils.add_keyval_json("last_video", last_video,
+                                              medialog_file)
         except KeyboardInterrupt:
             print("\nStopping...")
 
             # set last item succesfully downloaded in the medialog file:
             if sample_mode is False:
                 if type_file == "i" or type_file == "image":
-                    JSONUtils.add_keyval_json("last_image", last_image, medialog_file)
+                    JSONUtils.add_keyval_json("last_image", last_image,
+                                              medialog_file)
                 elif type_file == "v" or type_file == "video":
-                    JSONUtils.add_keyval_json("last_video", last_video, medialog_file)
+                    JSONUtils.add_keyval_json("last_video", last_video,
+                                              medialog_file)
         except Exception as e:
             print(e)
             raise
@@ -277,16 +298,15 @@ class extractor:
     @classmethod
     def list_extracted_collections(cls, path=None):
         """ lists every extracted collection in the directory
-            configured in CONF_FILE """
+            configured in COLLECTIONS_DIR """
 
         print("List of the extracted collections")
         print()
 
         if path is None:
-            with open(CONF_FILE, 'r') as fp:
-                conf = json.load(fp)
+            conf = COLLECTIONS
 
-            path = conf["collections"]["path"]
+            path = conf["path"]
 
         try:
             dir_list = next(os.walk(path))[1]
@@ -296,19 +316,19 @@ class extractor:
         except Exception:
             pass
 
-
-    def expand_texts(csvitems="", medialog_file="", from_beginning=False):
+    def expand_texts(self, csvitems="", medialog_file="",
+                     from_beginning=False):
         """ Sometimes, a Twitter item's text is not entirely stored in the
             database. This function aims to scrap the tweet url in order to
             get the full text """
 
         if csvitems == "":
-            csvitems = this.directory + "/" + CSVITEMS
+            csvitems = self.directory + "/" + CSVITEMS
 
         if medialog_file == "":
-            medialog_file = this.directory + "/" + MEDIALOG
+            medialog_file = self.directory + "/" + MEDIALOG
 
-        # PRE: determine the directory and the name of the file of augmented texts
+        # PRE: determine directory and name of the augmented texts's file
         last_dot = Text.lastocc(csvitems, ".")
 
         if last_dot == -1:
@@ -344,19 +364,23 @@ class extractor:
                 last_text = 0
         else:
             # write header of csvitem into csvitem_AUG
-            CSVUtils.write_line_b_csv(AUG_IT, next(csv.reader(open(csvitems, "r"))), True)
+            CSVUtils.write_line_b_csv(AUG_IT,
+                                      next(csv.reader(open(csvitems, "r"))),
+                                      True)
             last_text = 0
 
         # for each item, verify if its text should be expanded
         try:
-            #TODO - Add %
+            # TODO - Add %
             for it in itemsgen:
                 if Text.reduced_twitter_text(it[1]):
                     full_text = self.__full_tweet_text(it[8])
 
                     if full_text != "":
                         # write the expanded text
-                        CSVUtils.write_line_b_csv(AUG_IT, it[:1] + [full_text] + it[2:])
+                        CSVUtils.write_line_b_csv(AUG_IT,
+                                                  it[:1] + [full_text] + it[2:]
+                                                  )
                         print(it[0], full_text)
                     else:
                         CSVUtils.write_line_b_csv(AUG_IT, it)
@@ -379,7 +403,6 @@ class extractor:
             JSONUtils.add_keyval_json("last_text", last_text, medialog_file)
             raise
 
-
     def url_media(self, csvlinks="", csvset="", urldir="", medialog_file="",
                   directory="", ignore_twitter_link=True):
         """ scrap links from link_list """
@@ -387,7 +410,7 @@ class extractor:
         if csvlinks == "":
             csvlinks = CSVLINKS
         if csvset == "":
-            csvset = CSVSET
+            csvset = CSVSETURL
         if urldir == "":
             urldir = URLDIR
         if medialog_file == "":
@@ -436,8 +459,8 @@ class extractor:
 
                 if url not in setUrls.keys():
 
-                    print('\x1b[6;30;42m' + "Starting Scrapping for Link " +
-                          str(url) + " (" + str(seq) + ")" + '\x1b[0m')
+                    print('\x1b[6;30;42m' + "Starting Scrapping for Link "
+                          + str(url) + " (" + str(seq) + ")" + '\x1b[0m')
 
                     os.mkdir(seqdir)
                     os.chdir(seqdir)
@@ -448,7 +471,7 @@ class extractor:
                         signal.alarm(1000)
 
                         youtube_dl.YoutubeDL({}).download([url])
-                    except KeyboardInterrupt as e:
+                    except KeyboardInterrupt:
                         raise
                     except Exception as e:
                         print(e)
@@ -461,17 +484,18 @@ class extractor:
                             if "base64," in im:
                                 continue
 
-                            lo = Text.lastocc(im,"/")+1
+                            lo = Text.lastocc(im, "/")+1
 
                             if lo < len(im)-1:
-                                output = im[Text.lastocc(im,"/")+1:]
+                                output = im[Text.lastocc(im, "/")+1:]
                             else:
-                                output = im[Text.lastocc(im[:-1],"/")+1:-1]
+                                output = im[Text.lastocc(im[:-1], "/")+1:-1]
 
                             if output == "" or len(output) > 80:
-                                output = random.randint(1,10000000000000)
+                                output = random.randint(1, 10000000000000)
 
-                            self.__request_download(link=im, output=str(output))
+                            self.__request_download(link=im,
+                                                    output=str(output))
                         except requests.exceptions.ConnectionError as e:
                             print(e)
                             continue
@@ -485,8 +509,10 @@ class extractor:
 
                     CSVUtils.write_line_b_csv(csvfile=csvset, line=[seq, url])
 
-                    print('\x1b[6;30;42m' + "Scrap Finished for Link " + str(url) +
-                          " (" + str(round(row_count*100/total_row, 4)) + "%)" + '\x1b[0m')
+                    print('\x1b[6;30;42m' + "Scrap Finished for Link "
+                          + str(url) + " ("
+                          + str(round(row_count*100/total_row, 4)) + "%)"
+                          + '\x1b[0m')
 
                     seq += 1
                     seqdir = os.path.realpath(urldir + "/" + str(seq))
@@ -496,13 +522,13 @@ class extractor:
         except KeyboardInterrupt:
             print("Stopping...")
 
-            JSONUtils.add_keyval_json("next_urlSeq", seq, medialog_file);
+            JSONUtils.add_keyval_json("next_urlSeq", seq, medialog_file)
 
             os.chdir(root_dir)
 
             shutil.rmtree(seqdir)
         except Exception as e:
-            JSONUtils.add_keyval_json("next_urlSeq", seq, medialog_file);
+            JSONUtils.add_keyval_json("next_urlSeq", seq, medialog_file)
 
             os.chdir(root_dir)
 

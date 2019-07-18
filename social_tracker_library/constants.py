@@ -1,14 +1,15 @@
-#put constants here
+# put constants here
 
 import os
 
-CONF_FILE = os.path.dirname(os.path.realpath(__file__)) + "/" + "conf.json"
+QE_STOPWORDS = os.path.dirname(os.path.realpath(__file__)) + "/"
++ "qe_sets/stopwords.txt"
 
-QE_STOPWORDS = os.path.dirname(os.path.realpath(__file__)) + "/" + "qe_sets/stopwords.txt"
+QE_PLACES_DIR = os.path.dirname(os.path.realpath(__file__)) + "/"
++ "qe_sets/places/"
 
-QE_PLACES_DIR = os.path.dirname(os.path.realpath(__file__)) + "/" + "qe_sets/places/"
-
-QE_EVENT_THESAURUS_DIR = os.path.dirname(os.path.realpath(__file__)) + "/" + "qe_sets/event_thesaurus/"
+QE_EVENT_THESAURUS_DIR = os.path.dirname(os.path.realpath(__file__)) + "/"
++ "qe_sets/event_thesaurus/"
 
 QE_PLACES = ['BR']
 
@@ -32,7 +33,8 @@ VIDEODIR = "Videos/"
 
 URLDIR = "UrlMedia/"
 
-HEAD_ITEMS = ["csvid", "text", "location", "pubtime", "tags", "media", "source", "itemUrl"]
+HEAD_ITEMS = ["csvid", "text", "location", "pubtime", "tags", "media",
+              "source", "itemUrl"]
 
 HEAD_MEDIA = ["name", "csvid", "text", "location", "pubtime", "tags",
               "source", "url"]

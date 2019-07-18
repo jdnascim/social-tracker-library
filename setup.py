@@ -39,7 +39,7 @@ setup(
 
     python_requires='>=3.5, <4',
 
-    install_requires=['redis', 'twokenize', 'bs4', 'pymongo', 'scikit-image',
+    install_requires=['redis', 'twokenize', 'pymongo', 'scikit-image',
                       'lxml', 'youtube-dl', 'opencv-python', 'filetype',
                       'requests', 'newspaper3k']
 
