@@ -1,0 +1,9 @@
+filetype>=1.0.5
+lxml>=4.3.4
+newspaper3k>=0.2.8
+pymongo>=3.8.0
+redis>=3.2.1
+scikit-image>=0.15.0
+twokenize>=1.0.0
+youtube-dl>=2019.7.16
+requests>=2.22.0

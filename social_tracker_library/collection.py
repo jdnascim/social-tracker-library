@@ -366,7 +366,7 @@ class collection:
                 facet_tags[i]["variant_keys"] = []
 
             for i in range(len(facet_tags)):
-                tsr = Text.__strip_accents(facet_tags[i]["tags"])
+                tsr = Text.strip_accents(facet_tags[i]["tags"])
 
                 if facet_tags[i]["tags"
                                  ] != tsr and tsr in stressRemDict.keys():
