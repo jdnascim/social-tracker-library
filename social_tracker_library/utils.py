@@ -1,10 +1,10 @@
 import datetime
 import csv
 import os
-import parser
 import unicodedata
 import glob
 import json
+from dateutil import parser
 
 
 class Date:
