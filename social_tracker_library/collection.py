@@ -387,8 +387,11 @@ class collection:
 
         return facet_tags
 
-    def __create_files(self, directory=None):
-        """ create collection's dir and files """
+    def extract_collection(self, directory=None):
+        """ extracts items from a given collection, and organizes it in files
+        """
+
+        self.exists(exception_if_not=True)
 
         # creates dir where things are going to be stored
         if directory is None:
@@ -430,14 +433,6 @@ class collection:
                                   head_set_links, newfile=True)
         CSVUtils.write_line_b_csv(directory + "/" + CSVSETURL, head_set_links,
                                   newfile=True)
-
-    def extract_collection(self, directory=None):
-        """ extracts items from a given collection, and organizes it in files
-        """
-
-        self.exists(exception_if_not=True)
-
-        self.__create_files(directory)
 
         # query - Item
         print("Fetching...")
@@ -512,4 +507,4 @@ class collection:
 
             CSVUtils.write_line_b_csv(directory + "/" + CSVITEMS, line)
 
-        print("100.0% completed.")
+        print("Completed.")

@@ -4,10 +4,10 @@ import csv
 import shutil
 import requests
 import youtube_dl
-import html
 import random
 import signal
 from newspaper import Article
+from lxml import html
 
 from .constants import CSVITEMS, CSVIMAGE, CSVVIDEO, IMAGEDIR, VIDEODIR
 from .constants import URLDIR, CSVLINKS, CSVSETLINKS, CSVSETURL, MEDIALOG
@@ -117,7 +117,7 @@ class extractor:
         except Exception:
             pass
 
-    def media_csv_download(self, type_file, csvfile="", csvset="",
+    def media_csv_download(self, type_file="", csvfile="", csvset="",
                            medialog_file="", from_beginning=False,
                            sample=False, overwrite=False):
         """ download media from the csv generated
@@ -125,6 +125,15 @@ class extractor:
             from_beginning: defines if it will start based on the medialog_file
             sample: if it is a number, download (randomly and approximately)
             only total*sample items """
+
+        # if type_file not specified, download images AND videos
+        # it will recurse only once
+        if type_file == "" or type_file is None:
+            self.media_csv_download("i", csvfile, csvset, medialog_file,
+                                    from_beginning, sample, overwrite)
+            self.media_csv_download("v", csvfile, csvset, medialog_file,
+                                    from_beginning, sample, overwrite)
+            return ""
 
         # verify if sample is valid
         sample_mode = False
@@ -163,7 +172,10 @@ class extractor:
                 directory = self.directory
 
         if csvset == "":
-            csvset = directory + "/" + CSVSETLINKS
+            csvset = self.directory + "/" + CSVSETLINKS
+
+        if medialog_file == "":
+            medialog_file = self.directory + "/" + MEDIALOG
 
         # now it iterates through the csvfile [csvGenerator()] and download the
         # items [*.download() -> depends on the type specified]
@@ -172,8 +184,10 @@ class extractor:
 
         # if from_beginning = False, try to start from the file where it
         # stopped in the former iteration
-        last_image = str(JSONUtils.read_keyval_json("last_image", MEDIALOG))
-        last_video = str(JSONUtils.read_keyval_json("last_video", MEDIALOG))
+        last_image = str(JSONUtils.read_keyval_json("last_image",
+                                                    medialog_file))
+        last_video = str(JSONUtils.read_keyval_json("last_video",
+                                                    medialog_file))
 
         # TODO Add % completed
         try:
@@ -183,7 +197,7 @@ class extractor:
                 # will not check if each image exists or not, and will enhance
                 # performance)
                 if from_beginning is False:
-                    if "last_image" != "":
+                    if last_image != "":
                         last_image_fl = float(last_image.replace("_", "."))
                     else:
                         last_image = "0_0"
@@ -236,7 +250,7 @@ class extractor:
             elif type_file == "v" or type_file == "video":
                 # Previous Loop (See explanation in the image case)
                 if from_beginning is False:
-                    if "last_video" != "":
+                    if last_video != "":
                         last_video_fl = float(last_video.replace("_", "."))
                     else:
                         last_video = "0_0"

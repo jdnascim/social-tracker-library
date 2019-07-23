@@ -53,7 +53,7 @@ class Text:
             return -1
 
     @classmethod
-    def reduced_twitter_text(text):
+    def reduced_twitter_text(cls, text):
         """ returns True if the twitter item probably is shortened.
             Once the criterium was a little bit more complex, this
             is the reason why a nowadays quite simple function
@@ -97,6 +97,11 @@ class OSUtils:
                 tmp.append(line[:-1])
 
         return tmp
+
+    @classmethod
+    def str_to_file(cls, filename, s):
+        with open(filename, 'w') as filehandle:
+            filehandle.writelines("%s\n" % s)
 
     # This method is necessary, because youtube-dl adds extension
     # to the filename after downloading it. Plus, it may works
@@ -152,7 +157,7 @@ class CSVUtils:
     def csv_to_dict(cls, csvfile, id_key, id_value, delimiter=','):
         """ given a csv file, return a dict based upon it """
 
-        csvgen = cls.__csvGenerator(csvfile, delimiter=delimiter)
+        csvgen = cls.csvGenerator(csvfile, delimiter=delimiter)
 
         csvdict = dict()
 
@@ -186,8 +191,11 @@ class JSONUtils:
     def read_keyval_json(cls, key, jsonfile):
         """ read a key-value of a json file  """
 
-        with open(jsonfile) as f:
-            data = json.load(f)
+        if os.path.isfile(jsonfile):
+            with open(jsonfile, "r") as f:
+                data = json.load(f)
+        else:
+            return ""
 
         if key in data.keys():
             return data[key]

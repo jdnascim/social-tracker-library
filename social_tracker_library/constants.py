@@ -2,6 +2,8 @@
 
 import os
 
+QE_LOG = os.path.dirname(os.path.realpath(__file__)) + "/qe_sets/qe_log.txt"
+
 QE_STOPWORDS = os.path.dirname(os.path.realpath(__file__)
                                ) + "/qe_sets/stopwords.txt"
 

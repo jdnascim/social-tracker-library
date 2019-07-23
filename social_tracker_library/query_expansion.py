@@ -9,7 +9,7 @@ import operator
 
 from .collection import collection
 from .utils import Text, OSUtils
-from .constants import QE_STOPWORDS, QE_PLACES, QE_PLACES_DIR
+from .constants import QE_STOPWORDS, QE_PLACES, QE_PLACES_DIR, QE_LOG
 
 
 class query_expansion:
@@ -46,8 +46,16 @@ class query_expansion:
 
         return True
 
+    def __write_qe_log(title, ownerId, key_initial, key_after):
+        log = str(title) + '\n'
+        log += str(ownerId) + '\n'
+        log += "Initial Keywords: " + str(key_initial) + '\n'
+        log += "Final Keywords: " + str(key_after) + '\n\n'
+
+        OSUtils.str_to_file(QE_LOG, log)
+
     def Tags(self, tag_min_frequency=2, ask_conf=True, limit_suggestion=20,
-             stopwords_analysis=True, places_analysis='BR'):
+             stopwords_analysis=True, places_analysis='BR', log=True):
         """ applies query expansion related to tags """
 
         col = self.__qe_col_copy()
@@ -72,75 +80,78 @@ class query_expansion:
         # collection's current keywords - in order to not suggest these ones
         current_keys = set(col.keywords_list())
 
-        if ct > 0:
+        if ct <= 0:
+            raise Exception("Empty Collection")
 
-            # facet query execution
-            list_facet_tags = col.tags_facet_query()
+        # facet query execution
+        list_facet_tags = col.tags_facet_query()
 
-            new_keywords = []
+        new_keywords = []
 
-            # index through the facet query list
-            i = 0
+        # index through the facet query list
+        i = 0
 
-            # counts how many tags were suggested
-            counter = 0
+        # counts how many tags were suggested
+        counter = 0
 
-            # based on the frequency, counts the minumum appearance required
-            # for a tags to be suggested
-            if tag_min_frequency < 1:
-                min_qtde = ct*tag_min_frequency
-            else:
-                min_qtde = math.pow(ct, 1/tag_min_frequency)
+        # based on the frequency, counts the minumum appearance required
+        # for a tags to be suggested
+        if tag_min_frequency < 1:
+            min_qtde = ct*tag_min_frequency
+        else:
+            min_qtde = math.pow(ct, 1/tag_min_frequency)
 
-            # iteration through the tags list
-            while (i < len(list_facet_tags) and i < limit_suggestion
-                   and list_facet_tags[i]["count"] >= min_qtde):
+        # iteration through the tags list
+        while (i < len(list_facet_tags) and i < limit_suggestion
+               and list_facet_tags[i]["count"] >= min_qtde):
 
-                if counter > limit_suggestion:
-                    break
+            if counter > limit_suggestion:
+                break
 
-                if stopwords_analysis is True and (list_facet_tags[i]["tags"]
-                                                   in self.stopwords):
-
-                    i += 1
-                    continue
-
-                if places_analysis is not None and (list_facet_tags[i]['tags']
-                                                    in places):
-
-                    i += 1
-                    continue
-
-                # if ask_conf is false, just add. Otherwise, ask first
-                if ask_conf is False:
-                    new_keywords.append(list_facet_tags[i]["tags"])
-
-                    for k in list_facet_tags[i]["variant_keys"]:
-                        new_keywords.append(k)
-                else:
-                    if list_facet_tags[i]["tags"] not in current_keys and str(
-                        input("add " + str(list_facet_tags[i]["tags"])
-                              + "? (y/n)\n")) == "y":
-                            new_keywords.append(list_facet_tags[i]["tags"])
-
-                    for k in list_facet_tags[i]["variant_keys"]:
-                        if k not in current_keys and str(
-                            input("add variant " + str(k)
-                                  + "? (y/n)\n")) == "y":
-                                new_keywords.append(k)
+            if stopwords_analysis is True and (list_facet_tags[i]["tags"]
+                                               in self.stopwords):
 
                 i += 1
-                counter += 1
+                continue
 
-            col.add_keywords(new_keywords)
-        else:
-            print("Empty Collection")
+            if places_analysis is not None and (list_facet_tags[i]['tags']
+                                                in places):
+
+                i += 1
+                continue
+
+            # if ask_conf is false, just add. Otherwise, ask first
+            if ask_conf is False:
+                new_keywords.append(list_facet_tags[i]["tags"])
+
+                for k in list_facet_tags[i]["variant_keys"]:
+                    new_keywords.append(k)
+            else:
+                if list_facet_tags[i]["tags"] not in current_keys and str(
+                    input("add " + str(list_facet_tags[i]["tags"])
+                          + "? (y/n)\n")) == "y":
+                        new_keywords.append(list_facet_tags[i]["tags"])
+
+                for k in list_facet_tags[i]["variant_keys"]:
+                    if k not in current_keys and str(
+                        input("add variant " + str(k)
+                              + "? (y/n)\n")) == "y":
+                            new_keywords.append(k)
+
+            i += 1
+            counter += 1
+
+        col.add_keywords(new_keywords)
+
+        if log is True:
+            self.__write_qe_log(col.title, col.ownerId, current_keys,
+                                col.keywords_list())
 
     def __coocurrence_formula(self, freq0, freq1, freq_p):
         """ co-occurence formula """
         return ((((freq0*freq1)**2)*freq_p)/(freq0+freq1))**(1/2)
 
-    def Cooccurrence(self, ask_conf=True, limit_suggestion=20):
+    def Cooccurrence(self, ask_conf=True, limit_suggestion=20, log=True):
         """ add keywords in pair, according to its co-occurence in the texts
         """
 
@@ -155,6 +166,8 @@ class query_expansion:
 
         coocur = dict()
         freq_k = dict()
+
+        current_keys = col.keywords_list()
 
         for it in self.col.ContentGenerator():
             ct += 1
@@ -213,3 +226,7 @@ class query_expansion:
                 new_keywords.append(keyword)
 
         col.add_keywords(new_keywords)
+
+        if log is True:
+            self.__write_qe_log(col.title, col.ownerId, current_keys,
+                                col.keywords_list())
