@@ -189,13 +189,17 @@ class extractor:
         last_video = str(JSONUtils.read_keyval_json("last_video",
                                                     medialog_file))
 
-        # TODO Add % completed
         try:
             if type_file == "i" or type_file == "image":
                 # if from beginning is false, execute a previous loop, which
                 # tries to skip to the last image downloaded (therefore it
                 # will not check if each image exists or not, and will enhance
                 # performance)
+
+                # percentage
+                n_downloaded = 1
+                qtde_items = CSVUtils.count_lines(directory + "/" + CSVIMAGE)
+
                 if from_beginning is False:
                     if last_image != "":
                         last_image_fl = float(last_image.replace("_", "."))
@@ -208,6 +212,7 @@ class extractor:
                             if float(str(line[0]).replace("_", "."
                                                           )) == last_image_fl:
                                 print("Skipping until", line[0])
+                                n_downloaded += 1
                                 break
                             elif float(str(line[0]).replace("_", "."
                                                             )) > last_image_fl:
@@ -215,9 +220,12 @@ class extractor:
                                     "_", ".")), last_image_fl)
                                 print("Error: Last image in log does not \
                                       exist - Starting from the beginning")
+                                n_downloaded = 1
                                 csvGen = CSVUtils.csvGenerator(directory + "/"
                                                                + csvfile)
                                 break
+                            else:
+                                n_downloaded += 1
 
                 # Image Loop
                 for line in csvGen:
@@ -232,6 +240,11 @@ class extractor:
 
                         chk = self.__request_download(line[7], linkfile,
                                                       overwrite=overwrite)
+
+                        print('\x1b[6;30;42m'
+                              + str(round(n_downloaded*100/qtde_items, 4))
+                              + "%" + '\x1b[0m')
+                        n_downloaded += 1
 
                         if chk is True:
                             CSVUtils.write_line_b_csv(csvset,
@@ -248,6 +261,10 @@ class extractor:
                                               medialog_file)
 
             elif type_file == "v" or type_file == "video":
+                # percentage
+                n_downloaded = 1
+                qtde_items = CSVUtils.count_lines(directory + "/" + CSVVIDEO)
+
                 # Previous Loop (See explanation in the image case)
                 if from_beginning is False:
                     if last_video != "":
@@ -261,14 +278,18 @@ class extractor:
                             if float(str(line[0]
                                          ).replace("_", ".")) == last_video_fl:
                                 print("Skipping", line[0])
+                                n_downloaded += 1
                                 break
                             elif float(str(line[0]).replace("_", "."
                                                             )) > last_video_fl:
                                 print("Error: Last video in log does not exist\
                                        - Starting from the beginning")
+                                n_downloaded = 1
                                 csvGen = CSVUtils.csvGenerator(directory + "/"
                                                                + csvfile)
                                 break
+                            else:
+                                n_downloaded += 1
 
                 # Video Loop
                 for line in csvGen:
@@ -282,6 +303,11 @@ class extractor:
 
                     chk = self.__youtube_download(line[7], linkfile,
                                                   overwrite=overwrite)
+
+                    print('\x1b[6;30;42m'
+                          + str(round(n_downloaded*100/qtde_items, 4))
+                          + "%" + '\x1b[0m')
+                    n_downloaded += 1
 
                     if chk is True:
                         CSVUtils.write_line_b_csv(csvset,

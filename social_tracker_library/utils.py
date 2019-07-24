@@ -170,6 +170,11 @@ class CSVUtils:
 
         return csvdict
 
+    @classmethod
+    def count_lines(cls, csvfile, delimiter=",", hide_header=True):
+        return sum([1 for i in cls.csvGenerator(csvfile, delimiter,
+                                                hide_header)])
+
 
 class JSONUtils:
     @classmethod
