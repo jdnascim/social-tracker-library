@@ -157,18 +157,24 @@ class CSVUtils:
     def csv_to_dict(cls, csvfile, id_key, id_value, delimiter=','):
         """ given a csv file, return a dict based upon it """
 
-        csvgen = cls.csvGenerator(csvfile, delimiter=delimiter)
+        try:
+            csvgen = cls.csvGenerator(csvfile, delimiter=delimiter)
 
-        csvdict = dict()
+            csvdict = dict()
 
-        for row in csvgen:
-            csvdict[row[id_key]] = row[id_value]
+            for row in csvgen:
+                csvdict[row[id_key]] = row[id_value]
 
-        # TODO if every key is digit, turn into int
-        # TODO id_value should be a list of index
-        # TODO increment delimiter parameter (delimiter=',')
+            # TODO if every key is digit, turn into int
+            # TODO id_value should be a list of index
+            # TODO increment delimiter parameter (delimiter=',')
 
-        return csvdict
+            return csvdict
+        except FileNotFoundError:
+            return dict()
+        except Exception as e:
+            print(e)
+            raise
 
     @classmethod
     def count_lines(cls, csvfile, delimiter=",", hide_header=True):
