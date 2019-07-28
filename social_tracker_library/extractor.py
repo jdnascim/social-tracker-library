@@ -444,7 +444,7 @@ class extractor:
             raise
 
     def url_media(self, csvlinks="", csvset="", urldir="", medialog_file="",
-                  directory="", ignore_twitter_link=True):
+                  directory="", ignore_twitter_link=True, mediatype="v"):
         """ scrap links from link_list """
 
         if csvlinks == "":
@@ -457,6 +457,10 @@ class extractor:
             medialog_file = MEDIALOG
         if directory == "":
             directory = self.directory
+
+        mediatype = str(mediatype).lower()
+        if mediatype not in ("v", "i", "vi", "iv"):
+            mediatype = "vi"
 
         root_dir = os.getcwd()
 
@@ -505,43 +509,47 @@ class extractor:
                     os.mkdir(seqdir)
                     os.chdir(seqdir)
 
-                    try:
-                        # in order to avoid stalls in lives
-                        signal.signal(signal.SIGALRM, OSUtils.handler_timeout)
-                        signal.alarm(1000)
-
-                        youtube_dl.YoutubeDL({}).download([url])
-                    except KeyboardInterrupt:
-                        raise
-                    except Exception as e:
-                        print(e)
-                    finally:
-                        signal.alarm(0)
-
-                    for im in self.__urlImageGenerator(url):
+                    if "v" in mediatype:
                         try:
+                            # in order to avoid stalls in lives
+                            signal.signal(signal.SIGALRM,
+                                          OSUtils.handler_timeout)
+                            signal.alarm(1000)
 
-                            if "base64," in im:
+                            youtube_dl.YoutubeDL({}).download([url])
+                        except KeyboardInterrupt:
+                            raise
+                        except Exception as e:
+                            print(e)
+                        finally:
+                            signal.alarm(0)
+
+                    if "i" in mediatype:
+                        for im in self.__urlImageGenerator(url):
+                            try:
+
+                                if "base64," in im:
+                                    continue
+
+                                lo = Text.lastocc(im, "/")+1
+
+                                if lo < len(im)-1:
+                                    output = im[Text.lastocc(im, "/")+1:]
+                                else:
+                                    output = im[
+                                        Text.lastocc(im[:-1], "/")+1:-1]
+
+                                if output == "" or len(output) > 80:
+                                    output = random.randint(1, 10000000000000)
+
+                                self.__request_download(link=im,
+                                                        output=str(output))
+                            except requests.exceptions.ConnectionError as e:
+                                print(e)
                                 continue
-
-                            lo = Text.lastocc(im, "/")+1
-
-                            if lo < len(im)-1:
-                                output = im[Text.lastocc(im, "/")+1:]
-                            else:
-                                output = im[Text.lastocc(im[:-1], "/")+1:-1]
-
-                            if output == "" or len(output) > 80:
-                                output = random.randint(1, 10000000000000)
-
-                            self.__request_download(link=im,
-                                                    output=str(output))
-                        except requests.exceptions.ConnectionError as e:
-                            print(e)
-                            continue
-                        except requests.exceptions.InvalidSchema as e:
-                            print(e)
-                            continue
+                            except requests.exceptions.InvalidSchema as e:
+                                print(e)
+                                continue
 
                     os.chdir(directory)
 
