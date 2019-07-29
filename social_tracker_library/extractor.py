@@ -98,7 +98,8 @@ class extractor:
         try:
             if os.path.isfile(output) is False or overwrite is True:
                 youtube_dl.YoutubeDL({'outtmpl': output,
-                                      'noplaylist': True}).download([link])
+                                      'noplaylist': True,
+                                      'socket_timeout': 60}).download([link])
 
                 shutil.move(OSUtils.fileplusextension(output), output)
 
