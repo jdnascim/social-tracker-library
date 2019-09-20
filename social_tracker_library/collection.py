@@ -157,24 +157,28 @@ class collection:
         self.__publish_redis("collections:edit", json.dumps(edited_collection))
 
     @classmethod
-    def list_collections(cls):
+    def list_collections(cls, print_result=True):
         """ lists current collections in the system """
 
-        print("List of the collections in the system")
-        print()
+        str_r = []
+        str_r.append("List of the collections in the system\n")
 
         db_m = cls.__demoConnection()
 
         collection_settings = db_m.Collection.find()
 
         for col in collection_settings:
-            print("title:", str(col["title"]))
-            print("owner:", str(col["ownerId"]))
-            print("keywords:", str(col["keywords"]))
-            print("accounts:", str(col["accounts"]))
-            print("status:", str(col["status"]))
-            print("locations:", str(col["nearLocations"]))
-            print("")
+            str_r.append("title:" + str(col["title"]) + "\n")
+            str_r.append("owner:" + str(col["ownerId"]) + "\n")
+            str_r.append("keywords:" + str(col["keywords"]) + "\n")
+            str_r.append("accounts:" + str(col["accounts"]) + "\n")
+            str_r.append("status:" + str(col["status"]) + "\n")
+            str_r.append("locations:" + str(col["nearLocations"]) + "\n")
+
+        if print_result is True:
+            print(str_r)
+
+        return print_result
 
     def item_count(self, start_date=None, end_date=None, original=True):
         """ count the qtde of items given a collection """
