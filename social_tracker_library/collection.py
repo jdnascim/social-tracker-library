@@ -157,28 +157,36 @@ class collection:
         self.__publish_redis("collections:edit", json.dumps(edited_collection))
 
     @classmethod
-    def list_collections(cls, print_result=True):
+    def list_collections(cls, print_res=True):
         """ lists current collections in the system """
 
-        str_r = []
-        str_r.append("List of the collections in the system\n")
+        cols = dict()
+        if print_res is True:
+            print("List of the collections in the system")
+            print()
 
-        db_m = cls.__demoConnection()
+            db_m = cls.__demoConnection()
 
-        collection_settings = db_m.Collection.find()
+            collection_settings = db_m.Collection.find()
 
-        for col in collection_settings:
-            str_r.append("title:" + str(col["title"]) + "\n")
-            str_r.append("owner:" + str(col["ownerId"]) + "\n")
-            str_r.append("keywords:" + str(col["keywords"]) + "\n")
-            str_r.append("accounts:" + str(col["accounts"]) + "\n")
-            str_r.append("status:" + str(col["status"]) + "\n")
-            str_r.append("locations:" + str(col["nearLocations"]) + "\n")
+            for col in collection_settings:
+                cols[(col["title"], col["ownerId"])] = col
+                print("title:", str(col["title"]))
+                print("owner:", str(col["ownerId"]))
+                print("keywords:", str(col["keywords"]))
+                print("accounts:", str(col["accounts"]))
+                print("status:", str(col["status"]))
+                print("locations:", str(col["nearLocations"]))
+                print("")
 
-        if print_result is True:
-            print(str_r)
+        else:
+            db_m = cls.__demoConnection()
 
-        return print_result
+            collection_settings = db_m.Collection.find()
+            for col in collection_settings:
+                cols[(col["title"], col["ownerId"])] = col
+
+        return cols
 
     def item_count(self, start_date=None, end_date=None, original=True):
         """ count the qtde of items given a collection """
