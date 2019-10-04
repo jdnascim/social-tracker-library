@@ -11,11 +11,13 @@ from lxml import html
 
 from .constants import CSVITEMS, CSVIMAGE, CSVVIDEO, IMAGEDIR, VIDEODIR
 from .constants import URLDIR, CSVLINKS, CSVSETLINKS, CSVSETURL, MEDIALOG
-from .conf import COLLECTIONS
+from .constants import CONF_JSON
 from .utils import CSVUtils, OSUtils, JSONUtils, Text
 
 
 class extractor:
+    conf_json = CONF_JSON
+
     def __init__(self, directory="./"):
         self.directory = directory
 
@@ -345,7 +347,7 @@ class extractor:
         print()
 
         if path is None:
-            conf = COLLECTIONS
+            conf = JSONUtils.read_keyval_json(cls.conf_json, "COLLECTIONS")
 
             path = conf["path"]
 
@@ -444,20 +446,33 @@ class extractor:
             JSONUtils.add_keyval_json("last_text", last_text, medialog_file)
             raise
 
-    def url_media(self, csvlinks="", csvset="", urldir="", medialog_file="",
-                  directory="", ignore_twitter_link=True, mediatype="v"):
+
+    def url_media2(self, csvlinks="", csvset="", urldir="", medialog_file="",
+                  directory="", ignore_twitter_link=True, mediatype="vi",
+                  site_sources=[], name_scraping="", video_timelimit=1000):
         """ scrap links from link_list """
 
         if csvlinks == "":
             csvlinks = CSVLINKS
         if csvset == "":
             csvset = CSVSETURL
-        if urldir == "":
-            urldir = URLDIR
         if medialog_file == "":
             medialog_file = MEDIALOG
         if directory == "":
             directory = self.directory
+
+        if urldir == "" and name_scraping == "":
+            urldir = URLDIR
+            name_scraping = urldir.lower()
+        elif name_scraping == "":
+            name_scraping = urldir.lower()
+        elif urldir == "":
+            urldir = name_scraping
+
+        if urldir[-1] != "/":
+            urldir = urldir + "/"
+        if name_scraping[-1] == "/":
+            name_scraping = name_scraping[:-1]
 
         mediatype = str(mediatype).lower()
         if mediatype not in ("v", "i", "vi", "iv"):
@@ -475,12 +490,14 @@ class extractor:
 
         if urldir[-1] == '/':
             urldir = urldir[:-1]
+        OSUtils.createDir(urldir)
 
         seq = ""
 
         # get next sequence number
         if os.path.isfile(medialog_file):
-            seq = JSONUtils.read_keyval_json("next_urlSeq", medialog_file)
+            seq = JSONUtils.read_keyval_json("next_"+name_scraping+"Seq",
+                                             medialog_file)
 
         # if the parameter does not exist, get the seq from the
         if seq == "":
@@ -502,6 +519,11 @@ class extractor:
 
                 url = self.__expandURL(line[0])
 
+                if len(site_sources) > 0:
+                    if len([site for site in site_sources if site in url]
+                           ) == 0:
+                        continue
+
                 if url not in setUrls.keys():
 
                     print('\x1b[6;30;42m' + "Starting Scrapping for Link "
@@ -515,7 +537,7 @@ class extractor:
                             # in order to avoid stalls in lives
                             signal.signal(signal.SIGALRM,
                                           OSUtils.handler_timeout)
-                            signal.alarm(1000)
+                            signal.alarm(video_timelimit)
 
                             youtube_dl.YoutubeDL({}).download([url])
                         except KeyboardInterrupt:
@@ -528,7 +550,6 @@ class extractor:
                     if "i" in mediatype:
                         for im in self.__urlImageGenerator(url):
                             try:
-
                                 if "base64," in im:
                                     continue
 
@@ -571,13 +592,15 @@ class extractor:
         except KeyboardInterrupt:
             print("Stopping...")
 
-            JSONUtils.add_keyval_json("next_urlSeq", seq, medialog_file)
+            JSONUtils.add_keyval_json("next_"+name_scraping+"Seq", seq,
+                                      medialog_file)
 
             os.chdir(root_dir)
 
             shutil.rmtree(seqdir)
         except Exception as e:
-            JSONUtils.add_keyval_json("next_urlSeq", seq, medialog_file)
+            JSONUtils.add_keyval_json("next_"+name_scraping+"Seq", seq,
+                                      medialog_file)
 
             os.chdir(root_dir)
 

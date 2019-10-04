@@ -46,3 +46,5 @@ HEAD_LINK_LIST = ["link", "csvid_dir"]
 HEAD_SET_LINKS = ["link", "item_id", "path"]
 
 HEAD_SET_URLS = ["seq", "url"]
+
+CONF_JSON = "conf.json"

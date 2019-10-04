@@ -10,12 +10,14 @@ from pymongo import MongoClient
 from .constants import IMAGEDIR, VIDEODIR, URLDIR, HEAD_ITEMS, HEAD_LINK_LIST
 from .constants import HEAD_MEDIA, HEAD_SET_LINKS
 from .constants import CSVIMAGE, CSVITEMS, CSVLINKS, CSVVIDEO, CSVSETURL
-from .constants import CSVSETLINKS
-from .conf import MONGO, REDIS
-from .utils import Date, Text, OSUtils, CSVUtils
+from .constants import CSVSETLINKS, CONF_JSON
+from .utils import Date, Text, OSUtils, CSVUtils, JSONUtils
 
 
 class collection:
+    # class variable
+    conf_json = CONF_JSON
+
     def __init__(self, title, ownerId, start_date=None, end_date=None,
                  original=True):
         self.title = title
@@ -25,10 +27,10 @@ class collection:
         self.original = original
 
     @classmethod
-    def __demoConnection(cls):
+    def __demoConnection(cls, conf=conf_json):
         """ returns database connection """
 
-        conf = MONGO
+        conf = JSONUtils.read_keyval_json(cls.conf_json, "MONGO")
 
         client = MongoClient(
             conf["path"],
@@ -52,7 +54,7 @@ class collection:
     def __publish_redis(cls, channel, message):
         """ publish changes in redis (in order to inform listeners) """
 
-        conf = REDIS
+        conf = JSONUtils.read_keyval_json(cls.conf_json, "REDIS")
 
         r = redis.StrictRedis(host=conf["host"], port=conf["port"],
                               db=conf["db"])
