@@ -163,13 +163,12 @@ class collection:
         """ lists current collections in the system """
 
         cols = dict()
+        db_m = cls.__demoConnection()
+        collection_settings = db_m.Collection.find()
+
         if print_res is True:
             print("List of the collections in the system")
             print()
-
-            db_m = cls.__demoConnection()
-
-            collection_settings = db_m.Collection.find()
 
             for col in collection_settings:
                 cols[(col["title"], col["ownerId"])] = col
@@ -182,9 +181,6 @@ class collection:
                 print("")
 
         else:
-            db_m = cls.__demoConnection()
-
-            collection_settings = db_m.Collection.find()
             for col in collection_settings:
                 cols[(col["title"], col["ownerId"])] = col
 
