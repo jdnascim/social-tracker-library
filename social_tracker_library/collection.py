@@ -30,7 +30,7 @@ class collection:
     def __demoConnection(cls, conf=conf_json):
         """ returns database connection """
 
-        conf = JSONUtils.read_keyval_json(cls.conf_json, "MONGO")
+        conf = JSONUtils.read_keyval_json("MONGO", cls.conf_json)
 
         client = MongoClient(
             conf["path"],
@@ -54,7 +54,7 @@ class collection:
     def __publish_redis(cls, channel, message):
         """ publish changes in redis (in order to inform listeners) """
 
-        conf = JSONUtils.read_keyval_json(cls.conf_json, "REDIS")
+        conf = JSONUtils.read_keyval_json("REDIS", cls.conf_json)
 
         r = redis.StrictRedis(host=conf["host"], port=conf["port"],
                               db=conf["db"])
