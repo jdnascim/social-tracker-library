@@ -188,7 +188,7 @@ class collection:
     def list_collections(cls, print_res=True):
         """ lists current collections in the system """
 
-        cols = dict()
+        cols = list()
         db_m = cls.__demoConnection()
         collection_settings = db_m.Collection.find()
 
@@ -197,7 +197,7 @@ class collection:
             print()
 
             for col in collection_settings:
-                cols[(col["title"], col["ownerId"])] = col
+                cols.append(col)
                 print("title:", str(col["title"]))
                 print("owner:", str(col["ownerId"]))
                 print("keywords:", str(col["keywords"]))
@@ -208,7 +208,17 @@ class collection:
 
         else:
             for col in collection_settings:
-                cols[(col["title"], col["ownerId"])] = col
+                cols.append(col)
+
+        for col in cols:
+            keys = col['keywords']
+            col['keywords'] = list()
+            for k in keys:
+                col['keywords'].append(k['keyword'])
+
+            col['creationDate'] = Date.tmiles2date(col['creationDate'])
+            col['updateDate'] = Date.tmiles2date(col['updateDate'])
+            col['since'] = Date.tmiles2date(col['since'])
 
         return cols
 
