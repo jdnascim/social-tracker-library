@@ -243,7 +243,10 @@ class collection:
         _id = str(math.floor(random.random() * 90000) + 10000)
         + self.ownerId + str(creationDate)
 
-        since = Date.now(-15)
+        if self.start_date is not None:
+            since = self.start_date
+        else:
+            since = Date.now(-15)
 
         keywords_strconf = []
 
