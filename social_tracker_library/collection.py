@@ -216,9 +216,12 @@ class collection:
             for k in keys:
                 col['keywords'].append(k['keyword'])
 
-            col['creationDate'] = Date.tmiles2date(col['creationDate'])
-            col['updateDate'] = Date.tmiles2date(col['updateDate'])
-            col['since'] = Date.tmiles2date(col['since'])
+            col['creationDate'] = Date.tmiles2date(
+                col['creationDate']).strftime("%Y-%m-%d %H:%M:%S")
+            col['updateDate'] = Date.tmiles2date(
+                col['updateDate']).strftime("%Y-%m-%d %H:%M:%S")
+            col['since'] = Date.tmiles2date(
+                col['since']).strftime("%Y-%m-%d %H:%M:%S")
 
         return cols
 
