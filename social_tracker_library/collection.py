@@ -100,7 +100,6 @@ class collection:
 
         self.__publish_redis("collections:edit", json.dumps(edited_collection))
 
-
     def add_keywords(self, new_keywords):
         """ add new keywords in a given collection """
         self.exists(exception_if_not=True)
@@ -448,6 +447,10 @@ class collection:
                     + str(Date.now())
 
             directory = directory.replace(" ", "")
+
+            raw = JSONUtils.read_keyval_json("COLLECTIONS",
+                                             self.conf_json)['path']
+            directory = raw + directory
 
         OSUtils.createDir(directory)
         OSUtils.createDir(directory + "/" + IMAGEDIR)
