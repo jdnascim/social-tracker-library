@@ -74,6 +74,33 @@ class collection:
 
         return keys_l
 
+    def keywords_newset(self, new_keywords):
+        """ add a new set of keywords to a collection """
+        self.exists(exception_if_not=True)
+
+        if isinstance(new_keywords, str):
+            raise Exception("Error - please pass the keywords as a list")
+
+        db_m = self.__demoConnection()
+
+        set_new_keys = set()
+        for k in new_keywords:
+            set_new_keys.add(k.lower())
+
+        keys = list()
+        for new_key in set_new_keys:
+            keys.append({'keyword': new_key})
+
+        db_m.Collection.update_one(
+            {'title': self.title, 'ownerId': self.ownerId},
+            {'$set': {'keywords': keys}})
+
+        edited_collection = db_m.Collection.find_one(
+            {'title': self.title, 'ownerId': self.ownerId})
+
+        self.__publish_redis("collections:edit", json.dumps(edited_collection))
+
+
     def add_keywords(self, new_keywords):
         """ add new keywords in a given collection """
         self.exists(exception_if_not=True)
