@@ -564,5 +564,3 @@ class collection:
             CSVUtils.write_line_b_csv(directory + "/" + CSVITEMS, line)
 
         print("Completed.")
-
-        return directory
