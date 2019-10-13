@@ -18,8 +18,16 @@ from .utils import CSVUtils, OSUtils, JSONUtils, Text
 class extractor:
     conf_json = CONF_JSON
 
-    def __init__(self, directory="./"):
-        self.directory = directory
+    def __init__(self, directory=None):
+        base = JSONUtils("COLLECTIONS", self.conf_json)["path"]
+        if directory is None:
+            self.directory = base
+        elif os.path.isdir(directory) is True:
+            self.directory = directory
+        elif os.path.isdir(base + directory):
+            self.directory = base + directory
+        else:
+            raise Exception("Collection does not exist")
 
     @classmethod
     def __expandURL(self, link):
