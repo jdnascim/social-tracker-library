@@ -354,8 +354,10 @@ class extractor:
         print("List of the extracted collections")
         print()
 
+        cols = []
+
         if path is None:
-            conf = JSONUtils.read_keyval_json(cls.conf_json, "COLLECTIONS")
+            conf = JSONUtils.read_keyval_json("COLLECTIONS", cls.conf_json)
 
             path = conf["path"]
 
@@ -363,7 +365,10 @@ class extractor:
             dir_list = next(os.walk(path))[1]
             for dire in dir_list:
                 if dire[0] != '.':
+                    cols.append(dire)
                     print(dire)
+
+            return dire
         except Exception:
             pass
 
