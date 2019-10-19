@@ -185,30 +185,15 @@ class collection:
         self.__publish_redis("collections:edit", json.dumps(edited_collection))
 
     @classmethod
-    def list_collections(cls, print_res=True):
+    def list_collections(cls):
         """ lists current collections in the system """
 
         cols = list()
         db_m = cls.__demoConnection()
         collection_settings = db_m.Collection.find()
 
-        if print_res is True:
-            print("List of the collections in the system")
-            print()
-
-            for col in collection_settings:
-                cols.append(col)
-                print("title:", str(col["title"]))
-                print("owner:", str(col["ownerId"]))
-                print("keywords:", str(col["keywords"]))
-                print("accounts:", str(col["accounts"]))
-                print("status:", str(col["status"]))
-                print("locations:", str(col["nearLocations"]))
-                print("")
-
-        else:
-            for col in collection_settings:
-                cols.append(col)
+        for col in collection_settings:
+            cols.append(col)
 
         for col in cols:
             keys = col['keywords']
@@ -222,6 +207,8 @@ class collection:
                 col['updateDate']).strftime("%Y-%m-%d %H:%M:%S")
             col['since'] = Date.tmiles2date(
                 col['since']).strftime("%Y-%m-%d %H:%M:%S")
+
+            print(col)
 
         return cols
 
