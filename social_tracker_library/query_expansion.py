@@ -54,8 +54,9 @@ class query_expansion:
 
         OSUtils.str_to_file(QE_LOG, log)
 
-    def Tags(self, tag_min_frequency=2, ask_conf=True, limit_suggestion=20,
-             stopwords_analysis=True, places_analysis='BR', log=True):
+    def Tags(self, tag_min_frequency=2, limit_suggestion=20,
+             stopwords_analysis=True, places_analysis='BR', ask_conf=True,
+             log=True, add=True):
         """ applies query expansion related to tags """
 
         col = self.__qe_col_copy()
@@ -141,17 +142,21 @@ class query_expansion:
             i += 1
             counter += 1
 
-        col.add_keywords(new_keywords)
+        if add is True:
+            col.add_keywords(new_keywords)
 
         if log is True:
             self.__write_qe_log(col.title, col.ownerId, current_keys,
                                 col.keywords_list())
 
+        return new_keywords
+
     def __coocurrence_formula(self, freq0, freq1, freq_p):
         """ co-occurence formula """
         return ((((freq0*freq1)**2)*freq_p)/(freq0+freq1))**(1/2)
 
-    def Cooccurrence(self, ask_conf=True, limit_suggestion=20, log=True):
+    def Cooccurrence(self, limit_suggestion=20, ask_conf=True, add=True,
+                     log=True):
         """ add keywords in pair, according to its co-occurence in the texts
         """
 
