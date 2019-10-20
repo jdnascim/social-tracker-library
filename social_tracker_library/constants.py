@@ -4,8 +4,8 @@ import os
 
 QE_LOG = os.path.dirname(os.path.realpath(__file__)) + "/qe_sets/qe_log.txt"
 
-QE_STOPWORDS = os.path.dirname(os.path.realpath(__file__)
-                               ) + "/qe_sets/stopwords.txt"
+QE_STOPWORDS_DIR = os.path.dirname(os.path.realpath(__file__)
+                                   ) + "/qe_sets/stopwords/"
 
 QE_PLACES_DIR = os.path.dirname(os.path.realpath(__file__)
                                 ) + "/qe_sets/places/"
@@ -13,7 +13,11 @@ QE_PLACES_DIR = os.path.dirname(os.path.realpath(__file__)
 QE_EVENT_THESAURUS_DIR = os.path.dirname(os.path.realpath(__file__)
                                          ) + "/qe_sets/event_thesaurus/"
 
-QE_PLACES = ['BR']
+QE_STOPWORDS = ['PT']
+
+QE_PLACES = ['BR', 'GEN500K']
+
+QE_EVENT_THESAURUS = ['FIRE-PT']
 
 CSVITEMS = "items.csv"
 
