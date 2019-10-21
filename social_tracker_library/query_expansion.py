@@ -9,16 +9,36 @@ import operator
 
 from .collection import collection
 from .utils import Text, OSUtils
-from .constants import QE_STOPWORDS, QE_PLACES, QE_PLACES_DIR, QE_LOG
+from .constants import QE_STOPWORDS_DIR, QE_EVENT_THESAURUS_DIR, QE_PLACES_DIR
+from .constants import QE_LOG
 
 
 class query_expansion:
     def __init__(self, col: collection):
         self.col = col
-        self.stopwords = set(OSUtils.file_to_list(QE_STOPWORDS))
+
+        self.qe_places = list()
+        for s in os.listdir(QE_PLACES_DIR):
+            self.qe_places.append(s[:-4])
+
+        self.qe_stopwords = list()
+        for s in os.listdir(QE_STOPWORDS_DIR):
+            self.qe_places.append(s[:-4])
+
+        self.qe_event_thesaurus = list()
+        for s in os.listdir(QE_EVENT_THESAURUS_DIR):
+            self.qe_event_thesaurus.append(s[:-4])
 
     def places_available():
-        for s in os.listdir(QE_PLACES):
+        for s in os.listdir(QE_PLACES_DIR):
+            print(s[:-4])
+
+    def stopwords_available():
+        for s in os.listdir(QE_STOPWORDS_DIR):
+            print(s[:-4])
+
+    def event_thesaurus_available():
+        for s in os.listdir(QE_EVENT_THESAURUS_DIR):
             print(s[:-4])
 
     def __qe_col_copy(self):
@@ -54,9 +74,9 @@ class query_expansion:
 
         OSUtils.str_to_file(QE_LOG, log)
 
-    def Tags(self, tag_min_frequency=2, limit_suggestion=20,
-             stopwords_analysis=True, places_analysis='BR', ask_conf=True,
-             log=True, add=True):
+    def Tags(self, tag_min_frequency=2, limit_suggestion=20, add=True,
+             stopwords_analysis="PT", places_analysis='BR', ask_conf=True,
+             log=True):
         """ applies query expansion related to tags """
 
         col = self.__qe_col_copy()
@@ -68,12 +88,17 @@ class query_expansion:
                             + " - it should be bigger than 0")
 
         # places stopwords analysis
-        if places_analysis is not None and places_analysis in QE_PLACES:
-            places = set(OSUtils.file_to_list(QE_PLACES_DIR + QE_PLACES
+        if places_analysis is not None and places_analysis in self.qe_places:
+            places = set(OSUtils.file_to_list(QE_PLACES_DIR + places_analysis
                                               + ".txt"))
 
+        if (stopwords_analysis is not None) and (stopwords_analysis
+                                                 in self.qe_stopwords):
+            stopwords = set(OSUtils.file_to_list(QE_STOPWORDS_DIR +
+                                                 stopwords_analysis + ".txt"))
+
         # brief sleep for integrity reasons
-        time.sleep(2)
+        time.sleep(1)
 
         # collection's qtde of items
         ct = col.item_count()
@@ -109,8 +134,8 @@ class query_expansion:
             if counter > limit_suggestion:
                 break
 
-            if stopwords_analysis is True and (list_facet_tags[i]["tags"]
-                                               in self.stopwords):
+            if stopwords_analysis is not None and (list_facet_tags[i]["tags"]
+                                                   in stopwords):
 
                 i += 1
                 continue
@@ -165,7 +190,7 @@ class query_expansion:
 
         col = self.__qe_col_copy()
 
-        time.sleep(2)
+        time.sleep(1)
 
         ct = 0
 
