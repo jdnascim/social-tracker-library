@@ -230,17 +230,14 @@ class collection:
         # future implementation
         # users = []  Users (prefeituraunicamp facebook, jornaloglobo twitter)
         # location = []  Location
-
-        self.exists(exception_if_exists=True)
-
         if self.exists():
             raise Exception("Error - Collection with same title and owner\
                             already exists")
 
         creationDate = Date.now()
 
-        _id = str(math.floor(random.random() * 90000) + 10000)
-        + self.ownerId + str(creationDate)
+        _id = str(math.floor(random.random() * 90000) + 10000
+                  ) + self.ownerId + str(creationDate)
 
         if self.start_date is not None:
             since = self.start_date
@@ -551,3 +548,15 @@ class collection:
             CSVUtils.write_line_b_csv(directory + "/" + CSVITEMS, line)
 
         print("Completed.")
+
+    def delete(self):
+        db_m = self.__demoConnection()
+
+        collection = {
+            "title": self.title,
+            "ownerId": self.ownerId,
+        }
+
+        db_m.Collection.delete_one(collection)
+
+        #self.__publish_redis("collections:new", json.dumps(new_collection))
