@@ -66,9 +66,9 @@ class query_expansion:
 
         return True
 
-    def __write_qe_log(title, ownerId, key_initial, key_after):
-        log = str(title) + '\n'
-        log += str(ownerId) + '\n'
+    def __write_qe_log(self, key_initial, key_after):
+        log = str(self.col.title) + '\n'
+        log += str(self.col.ownerId) + '\n'
         log += "Initial Keywords: " + str(key_initial) + '\n'
         log += "Final Keywords: " + str(key_after) + '\n\n'
 
@@ -80,6 +80,9 @@ class query_expansion:
         """ applies query expansion related to tags """
 
         col = self.__qe_col_copy()
+
+        places = set()
+        stopwords = set()
 
         # verify integrity of the rate
         if tag_min_frequency < 0 or (tag_min_frequency is None
@@ -104,7 +107,7 @@ class query_expansion:
         ct = col.item_count()
 
         # collection's current keywords - in order to not suggest these ones
-        current_keys = set(col.keywords_list())
+        initial_keys = set(col.keywords_list())
 
         if ct <= 0:
             raise Exception("Empty Collection")
@@ -153,13 +156,13 @@ class query_expansion:
                 for k in list_facet_tags[i]["variant_keys"]:
                     new_keywords.append(k)
             else:
-                if list_facet_tags[i]["tags"] not in current_keys and str(
+                if list_facet_tags[i]["tags"] not in initial_keys and str(
                     input("add " + str(list_facet_tags[i]["tags"])
                           + "? (y/n)\n")) == "y":
                         new_keywords.append(list_facet_tags[i]["tags"])
 
                 for k in list_facet_tags[i]["variant_keys"]:
-                    if k not in current_keys and str(
+                    if k not in initial_keys and str(
                         input("add variant " + str(k)
                               + "? (y/n)\n")) == "y":
                             new_keywords.append(k)
@@ -170,9 +173,8 @@ class query_expansion:
         if add is True:
             col.add_keywords(new_keywords)
 
-        if log is True:
-            self.__write_qe_log(col.title, col.ownerId, current_keys,
-                                col.keywords_list())
+        if log is True and add is True:
+            self.__write_qe_log(initial_keys, col.keywords_list())
 
         return new_keywords
 
@@ -197,7 +199,7 @@ class query_expansion:
         coocur = dict()
         freq_k = dict()
 
-        current_keys = col.keywords_list()
+        initial_keys = col.keywords_list()
 
         for it in self.col.ContentGenerator():
             ct += 1
@@ -257,6 +259,5 @@ class query_expansion:
 
         col.add_keywords(new_keywords)
 
-        if log is True:
-            self.__write_qe_log(col.title, col.ownerId, current_keys,
-                                col.keywords_list())
+        if log is True and add is True:
+            self.__write_qe_log(initial_keys, col.keywords_list())
