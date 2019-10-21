@@ -26,12 +26,8 @@ class Date:
     def now(cls, days=0):
         """ return now in miles """
 
-        if days >= 0:
-            return int(datetime.datetime.now().strftime("%s")
-                       + datetime.timedelta(days=days)) * 1000
-        else:
-            return int(datetime.datetime.now().strftime("%s")
-                       + datetime.timedelta(days=(-1)*days)) * 1000
+        return int((datetime.datetime.now() + datetime.timedelta
+                    (days=days)).strftime("%s")) * 1000
 
 
 class Text:
