@@ -54,7 +54,7 @@ class query_expansion:
     def __pair_in_keywords(self, key1, key2):
         """ verifies if a pair is among the collection keywords """
 
-        current_keywords = self.col.keywords_list
+        current_keywords = self.col.keywords_list()
         if key1 in current_keywords:
             return False
         if key2 in current_keywords:
