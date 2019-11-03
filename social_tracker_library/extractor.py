@@ -454,7 +454,7 @@ class extractor:
             print("\nStopping...")
 
             # set last verified text in the medialog file:
-        JSONUtils.add_keyval_json("last_text", last_text, medialog_file)
+            JSONUtils.add_keyval_json("last_text", last_text, medialog_file)
         except Exception as e:
             print(e)
             JSONUtils.add_keyval_json("last_text", last_text, medialog_file)
