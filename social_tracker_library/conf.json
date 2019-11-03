@@ -7,7 +7,7 @@
     },
 
     "REDIS": {
-        "host": "localhost",
+        "host": "",
         "port": 6379,
         "db": 0
     },
