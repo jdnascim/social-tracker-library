@@ -19,7 +19,8 @@ class extractor:
     conf_json = CONF_JSON
 
     def __init__(self, directory=None):
-        base = JSONUtils("COLLECTIONS", self.conf_json)["path"]
+        base = JSONUtils.read_keyval_json("COLLECTIONS",
+                                          self.conf_json)["path"]
         if directory is None:
             self.directory = base
         elif os.path.isdir(directory) is True:
@@ -368,7 +369,7 @@ class extractor:
                     cols.append(dire)
                     print(dire)
 
-            return dire
+            return cols
         except Exception:
             pass
 
@@ -453,14 +454,13 @@ class extractor:
             print("\nStopping...")
 
             # set last verified text in the medialog file:
-            JSONUtils.add_keyval_json("last_text", last_text, medialog_file)
+        JSONUtils.add_keyval_json("last_text", last_text, medialog_file)
         except Exception as e:
             print(e)
             JSONUtils.add_keyval_json("last_text", last_text, medialog_file)
             raise
 
-
-    def url_media2(self, csvlinks="", csvset="", urldir="", medialog_file="",
+    def url_media(self, csvlinks="", csvset="", urldir="", medialog_file="",
                   directory="", ignore_twitter_link=True, mediatype="vi",
                   site_sources=[], name_scraping="", video_timelimit=1000):
         """ scrap links from link_list """
