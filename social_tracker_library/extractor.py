@@ -563,6 +563,10 @@ class extractor:
                     if "i" in mediatype:
                         for im in self.__urlImageGenerator(url):
                             try:
+                                signal.signal(signal.SIGALRM,
+                                              OSUtils.handler_timeout)
+                                signal.alarm(video_timelimit)
+
                                 if "base64," in im:
                                     continue
 
@@ -585,6 +589,8 @@ class extractor:
                             except requests.exceptions.InvalidSchema as e:
                                 print(e)
                                 continue
+                            finally:
+                                signal.alarm(0)
 
                     os.chdir(directory)
 
