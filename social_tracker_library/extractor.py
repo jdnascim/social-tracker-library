@@ -462,7 +462,8 @@ class extractor:
 
     def url_media(self, csvlinks="", csvset="", urldir="", medialog_file="",
                   directory="", ignore_twitter_link=True, mediatype="vi",
-                  site_sources=[], name_scraping="", video_timelimit=1000):
+                  site_sources=[], name_scraping="", video_timelimit=1000,
+                  image_timelimit=60):
         """ scrap links from link_list """
 
         if csvlinks == "":
@@ -565,7 +566,7 @@ class extractor:
                             try:
                                 signal.signal(signal.SIGALRM,
                                               OSUtils.handler_timeout)
-                                signal.alarm(video_timelimit)
+                                signal.alarm(image_timelimit)
 
                                 if "base64," in im:
                                     continue
