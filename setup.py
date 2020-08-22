@@ -14,7 +14,7 @@ with open('requirements.txt') as f:
 setup(
     name='social-tracker-library',  # Required
 
-    version='0.2.28',  # Required
+    version='0.2.29',  # Required
 
     description='Python library to communicate with the Social Tracker \
     application',  # Optional
