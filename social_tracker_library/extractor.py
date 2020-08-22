@@ -589,6 +589,8 @@ class extractor:
                             except requests.exceptions.InvalidSchema as e:
                                 print(e)
                                 continue
+                            except Exception as e:
+                                print(e)
                             finally:
                                 signal.alarm(0)
 
